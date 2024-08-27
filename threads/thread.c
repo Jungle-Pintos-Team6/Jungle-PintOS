@@ -40,6 +40,8 @@ static struct lock tid_lock;
 /* Thread destruction requests */
 static struct list destruction_req;
 
+static struct list wait_list;
+
 /* Statistics. */
 static long long idle_ticks;   /* # of timer ticks spent idle. */
 static long long kernel_ticks; /* # of timer ticks in kernel threads. */
@@ -105,6 +107,7 @@ void thread_init(void) {
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&destruction_req);
+	list_init(&wait_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread();
@@ -475,7 +478,7 @@ static void thread_launch(struct thread *th) {
 		"pop %%rbx\n"
 		"addq $(out_iret -  __next), %%rbx\n"
 		"movq %%rbx, 0(%%rax)\n" // rip
-		"movw %%cs, 8(%%rax)\n"  // cs
+		"movw %%cs, 8(%%rax)\n"	 // cs
 		"pushfq\n"
 		"popq %%rbx\n"
 		"mov %%rbx, 16(%%rax)\n" // eflags
@@ -552,4 +555,42 @@ static tid_t allocate_tid(void) {
 	lock_release(&tid_lock);
 
 	return tid;
+}
+
+void thread_wait(int64_t ticks) {
+	struct thread *current;
+	enum intr_level old_level;
+	old_level = intr_disable();
+
+	current = thread_current();
+	ASSERT(current != idle_thread);
+	current->wake_ticks = ticks;
+	list_insert_ordered(&wait_list, &current->elem, compare_ticks, NULL);
+
+	thread_block();
+	intr_set_level(old_level);
+}
+
+bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
+				   void *aux UNUSED) {
+	struct thread *a_ = list_entry(a, struct thread, elem);
+	struct thread *b_ = list_entry(b, struct thread, elem);
+	return a_->wake_ticks < b_->wake_ticks;
+}
+
+void wake_thread(int64_t current_tick) {
+	enum intr_level old_level;
+	old_level = intr_disable();
+	struct list_elem *current_elem = list_begin(&wait_list);
+	while (current_elem != list_end(&wait_list)) {
+		struct thread *current_thread =
+			list_entry(current_elem, struct thread, elem);
+		if (current_tick >= current_thread->wake_ticks) {
+			current_elem = list_remove(current_elem);
+			thread_unblock(current_thread);
+		} else {
+			break;
+		}
+	}
+	intr_set_level(old_level);
 }
