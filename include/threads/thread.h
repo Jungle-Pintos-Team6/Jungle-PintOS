@@ -12,7 +12,7 @@
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING, /* Running thread. */
-	THREAD_READY,   /* Not running but ready to run. */
+	THREAD_READY,	/* Not running but ready to run. */
 	THREAD_BLOCKED, /* Waiting for an event to trigger. */
 	THREAD_DYING	/* About to be destroyed. */
 };
@@ -20,12 +20,12 @@ enum thread_status {
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
-#define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
+#define TID_ERROR ((tid_t) - 1) /* Error value for tid_t. */
 
 /* Thread priorities. */
-#define PRI_MIN 0	  /* Lowest priority. */
+#define PRI_MIN 0	   /* Lowest priority. */
 #define PRI_DEFAULT 31 /* Default priority. */
-#define PRI_MAX 63	 /* Highest priority. */
+#define PRI_MAX 63	   /* Highest priority. */
 
 /* A kernel thread or user process.
  *
@@ -84,29 +84,38 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
-struct thread {
-	/* Owned by thread.c. */
-	tid_t tid;				   /* Thread identifier. */
-	enum thread_status status; /* Thread state. */
-	char name[16];			   /* Name (for debugging purposes). */
-	int priority;			   /* Priority. */
-	int64_t wakeup_time;
 
-	/* Shared between thread.c and synch.c. */
-	struct list_elem elem; /* List element. */
+struct thread {
+	/* thread.c에 의해 관리되는 필드들 */
+	tid_t tid; /* 스레드 식별자. 각 스레드의 고유 ID */
+	enum thread_status status; /* 스레드 상태. (THREAD_RUNNING, THREAD_READY,
+								  THREAD_BLOCKED 등) */
+	char name[16]; /* 스레드 이름. 디버깅 목적으로 사용 (최대 15자 + null
+					  종료자) */
+	int priority; /* 스레드 우선순위. 스케줄링에 사용됨 */
+	int64_t wakeup_time; /* 스레드가 깨어나야 할 시간. 타이머 인터럽트와 함께
+							사용 */
+
+	/* thread.c와 synch.c 사이에 공유되는 필드 */
+	struct list_elem elem; /* 리스트 요소. 스레드를 여러 리스트(예:
+							  ready_list)에 넣을 때 사용 */
 
 #ifdef USERPROG
-	/* Owned by userprog/process.c. */
-	uint64_t *pml4; /* Page map level 4 */
-#endif
-#ifdef VM
-	/* Table for whole virtual memory owned by thread. */
-	struct supplemental_page_table spt;
+	/* userprog/process.c에 의해 관리되는 필드 */
+	uint64_t
+		*pml4; /* 페이지 맵 레벨 4. 사용자 프로세스의 가상 메모리 관리에 사용 */
 #endif
 
-	/* Owned by thread.c. */
-	struct intr_frame tf; /* Information for switching */
-	unsigned magic;		  /* Detects stack overflow. */
+#ifdef VM
+	/* 스레드가 소유한 전체 가상 메모리를 위한 테이블 */
+	struct supplemental_page_table
+		spt; /* 보조 페이지 테이블. 가상 메모리 관리에 사용 */
+#endif
+
+	/* thread.c에 의해 관리되는 필드들 */
+	struct intr_frame
+		tf; /* 인터럽트 프레임. 컨텍스트 스위칭에 필요한 정보 저장 */
+	unsigned magic; /* 스택 오버플로우 감지를 위한 매직 넘버 */
 };
 
 /* If false (default), use round-robin scheduler.
