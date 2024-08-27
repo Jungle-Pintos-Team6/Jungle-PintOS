@@ -103,42 +103,43 @@ struct list {
 #define list_entry(LIST_ELEM, STRUCT, MEMBER)                                  \
 	((STRUCT *)((uint8_t *)&(LIST_ELEM)->next - offsetof(STRUCT, MEMBER.next)))
 
+/* Initializes list. */
 void list_init(struct list *);
 
 /* List traversal. */
-struct list_elem *list_begin(struct list *);
-struct list_elem *list_next(struct list_elem *);
-struct list_elem *list_end(struct list *);
+struct list_elem *list_begin(struct list *);  /* Returns first element in list. */
+struct list_elem *list_next(struct list_elem *);  /* Returns next element in list. */
+struct list_elem *list_end(struct list *);  /* Returns the element after the last element in list. */
 
-struct list_elem *list_rbegin(struct list *);
-struct list_elem *list_prev(struct list_elem *);
-struct list_elem *list_rend(struct list *);
+struct list_elem *list_rbegin(struct list *);  /* Returns last element in list. */
+struct list_elem *list_prev(struct list_elem *);  /* Returns the previous element in list. */
+struct list_elem *list_rend(struct list *);  /* Returns the element before the first element in list. */
 
-struct list_elem *list_head(struct list *);
-struct list_elem *list_tail(struct list *);
+struct list_elem *list_head(struct list *);  /* Returns list head. */
+struct list_elem *list_tail(struct list *);  /* Returns list tail. */
 
 /* List insertion. */
-void list_insert(struct list_elem *, struct list_elem *);
-void list_splice(struct list_elem *before, struct list_elem *first,
-				 struct list_elem *last);
-void list_push_front(struct list *, struct list_elem *);
-void list_push_back(struct list *, struct list_elem *);
+void list_insert(struct list_elem *, struct list_elem *);  /* Inserts ELEM just before BEFORE. */
+void list_splice(struct list_elem *before,
+                 struct list_elem *first, struct list_elem *last);  /* Moves elements from [FIRST, LAST) into list just before BEFORE. */
+void list_push_front(struct list *, struct list_elem *);  /* Inserts ELEM at the beginning of LIST. */
+void list_push_back(struct list *, struct list_elem *);  /* Inserts ELEM at the end of LIST. */
 
 /* List removal. */
-struct list_elem *list_remove(struct list_elem *);
-struct list_elem *list_pop_front(struct list *);
-struct list_elem *list_pop_back(struct list *);
+struct list_elem *list_remove(struct list_elem *);  /* Removes ELEM from its list and returns the element that followed it. */
+struct list_elem *list_pop_front(struct list *);  /* Removes the front element from LIST and returns it. */
+struct list_elem *list_pop_back(struct list *);  /* Removes the back element from LIST and returns it. */
 
 /* List elements. */
-struct list_elem *list_front(struct list *);
-struct list_elem *list_back(struct list *);
+struct list_elem *list_front(struct list *);  /* Returns the front element in LIST. */
+struct list_elem *list_back(struct list *);  /* Returns the back element in LIST. */
 
 /* List properties. */
-size_t list_size(struct list *);
-bool list_empty(struct list *);
+size_t list_size(struct list *);  /* Returns the number of elements in LIST. */
+bool list_empty(struct list *);  /* Returns true if LIST is empty, false otherwise. */
 
 /* Miscellaneous. */
-void list_reverse(struct list *);
+void list_reverse(struct list *);  /* Reverses the order of LIST. */
 
 /* Compares the value of two list elements A and B, given
    auxiliary data AUX.  Returns true if A is less than B, or
@@ -147,14 +148,14 @@ typedef bool list_less_func(const struct list_elem *a,
 							const struct list_elem *b, void *aux);
 
 /* Operations on lists with ordered elements. */
-void list_sort(struct list *, list_less_func *, void *aux);
-void list_insert_ordered(struct list *, struct list_elem *, list_less_func *,
-						 void *aux);
-void list_unique(struct list *, struct list *duplicates, list_less_func *,
-				 void *aux);
+void list_sort(struct list *, list_less_func *, void *aux);  /* Sorts LIST according to LESS given auxiliary data AUX. */
+void list_insert_ordered(struct list *, struct list_elem *,
+                         list_less_func *, void *aux);  /* Inserts ELEM in the proper position in LIST, according to LESS given auxiliary data AUX. */
+void list_unique(struct list *, struct list *duplicates,
+                 list_less_func *, void *aux);  /* Removes duplicate elements from LIST. */
 
 /* Max and min. */
-struct list_elem *list_max(struct list *, list_less_func *, void *aux);
-struct list_elem *list_min(struct list *, list_less_func *, void *aux);
+struct list_elem *list_max(struct list *, list_less_func *, void *aux);  /* Returns the element with the largest value in LIST. */
+struct list_elem *list_min(struct list *, list_less_func *, void *aux);  /* Returns the element with the smallest value in LIST. */
 
 #endif /* lib/kernel/list.h */
