@@ -105,17 +105,29 @@ static void pic_end_of_interrupt(int irq);
 /* Interrupt handlers. */
 void intr_handler(struct intr_frame *args);
 
-/* Returns the current interrupt status. */
+/* 현재 인터럽트 상태를 반환합니다. */
 enum intr_level intr_get_level(void) {
-	uint64_t flags;
+    // 64비트 정수형 변수 flags 선언
+    // 이 변수는 프로세서의 RFLAGS 레지스터 값을 저장할 것입니다.
+    uint64_t flags;
 
-	/* Push the flags register on the processor stack, then pop the
-	   value off the stack into `flags'.  See [IA32-v2b] "PUSHF"
-	   and "POP" and [IA32-v3a] 5.8.1 "Masking Maskable Hardware
-	   Interrupts". */
-	asm volatile("pushfq; popq %0" : "=g"(flags));
+    /* 프로세서의 플래그 레지스터를 스택에 푸시한 다음,
+       그 값을 스택에서 팝하여 'flags' 변수에 저장합니다.
+       참조: [IA32-v2b] "PUSHF" 및 "POP" 명령어 설명과
+       [IA32-v3a] 5.8.1 "마스크 가능한 하드웨어 인터럽트 마스킹" 섹션 */
+    
+    // 인라인 어셈블리 코드 실행
+    // "pushfq" : RFLAGS 레지스터의 값을 스택에 푸시
+    // "popq %0" : 스택의 최상위 값을 팝하여 flags 변수에 저장
+    // "=g"(flags) : 결과를 flags 변수에 저장하라는 제약 조건
+    // volatile : 컴파일러가 이 코드를 최적화하거나 재배치하지 않도록 함
+    asm volatile("pushfq; popq %0" : "=g"(flags));
 
-	return flags & FLAG_IF ? INTR_ON : INTR_OFF;
+    // RFLAGS 레지스터의 IF(Interrupt Flag) 비트를 확인
+    // FLAG_IF와 비트 AND 연산을 수행하여 IF 비트가 설정되어 있는지 확인
+    // IF 비트가 1이면 인터럽트가 활성화된 상태(INTR_ON)
+    // IF 비트가 0이면 인터럽트가 비활성화된 상태(INTR_OFF)
+    return flags & FLAG_IF ? INTR_ON : INTR_OFF;
 }
 
 /* Enables or disables interrupts as specified by LEVEL and
