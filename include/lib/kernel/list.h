@@ -83,79 +83,75 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* List element. */
+/* 리스트 요소 */
 struct list_elem {
-	struct list_elem *prev; /* Previous list element. */
-	struct list_elem *next; /* Next list element. */
+    struct list_elem *prev; /* 이전 리스트 요소 */
+    struct list_elem *next; /* 다음 리스트 요소 */
 };
 
-/* List. */
+/* 리스트 */
 struct list {
-	struct list_elem head; /* List head. */
-	struct list_elem tail; /* List tail. */
+    struct list_elem head; /* 리스트 헤드 */
+    struct list_elem tail; /* 리스트 테일 */
 };
 
-/* Converts pointer to list element LIST_ELEM into a pointer to
-   the structure that LIST_ELEM is embedded inside.  Supply the
-   name of the outer structure STRUCT and the member name MEMBER
-   of the list element.  See the big comment at the top of the
-   file for an example. */
+/* LIST_ELEM 포인터를 포함하는 구조체의 포인터로 변환
+   STRUCT는 외부 구조체 이름, MEMBER는 리스트 요소의 멤버 이름 */
 #define list_entry(LIST_ELEM, STRUCT, MEMBER)                                  \
-	((STRUCT *)((uint8_t *)&(LIST_ELEM)->next - offsetof(STRUCT, MEMBER.next)))
+    ((STRUCT *)((uint8_t *)&(LIST_ELEM)->next - offsetof(STRUCT, MEMBER.next)))
 
-/* Initializes list. */
+/* 리스트 초기화 */
 void list_init(struct list *);
 
-/* List traversal. */
-struct list_elem *list_begin(struct list *);  /* Returns first element in list. */
-struct list_elem *list_next(struct list_elem *);  /* Returns next element in list. */
-struct list_elem *list_end(struct list *);  /* Returns the element after the last element in list. */
+/* 리스트 순회 */
+struct list_elem *list_begin(struct list *);  /* 리스트의 첫 번째 요소 반환 */
+struct list_elem *list_next(struct list_elem *);  /* 다음 요소 반환 */
+struct list_elem *list_end(struct list *);  /* 마지막 요소 다음의 요소 반환 */
 
-struct list_elem *list_rbegin(struct list *);  /* Returns last element in list. */
-struct list_elem *list_prev(struct list_elem *);  /* Returns the previous element in list. */
-struct list_elem *list_rend(struct list *);  /* Returns the element before the first element in list. */
+struct list_elem *list_rbegin(struct list *);  /* 리스트의 마지막 요소 반환 */
+struct list_elem *list_prev(struct list_elem *);  /* 이전 요소 반환 */
+struct list_elem *list_rend(struct list *);  /* 첫 번째 요소 이전의 요소 반환 */
 
-struct list_elem *list_head(struct list *);  /* Returns list head. */
-struct list_elem *list_tail(struct list *);  /* Returns list tail. */
+struct list_elem *list_head(struct list *);  /* 리스트 헤드 반환 */
+struct list_elem *list_tail(struct list *);  /* 리스트 테일 반환 */
 
-/* List insertion. */
-void list_insert(struct list_elem *, struct list_elem *);  /* Inserts ELEM just before BEFORE. */
+/* 리스트 삽입 */
+void list_insert(struct list_elem *, struct list_elem *);  /* BEFORE 바로 앞에 ELEM 삽입 */
 void list_splice(struct list_elem *before,
-                 struct list_elem *first, struct list_elem *last);  /* Moves elements from [FIRST, LAST) into list just before BEFORE. */
-void list_push_front(struct list *, struct list_elem *);  /* Inserts ELEM at the beginning of LIST. */
-void list_push_back(struct list *, struct list_elem *);  /* Inserts ELEM at the end of LIST. */
+                 struct list_elem *first, struct list_elem *last);  /* [FIRST, LAST) 범위의 요소들을 BEFORE 앞으로 이동 */
+void list_push_front(struct list *, struct list_elem *);  /* ELEM을 LIST의 시작에 삽입 */
+void list_push_back(struct list *, struct list_elem *);  /* ELEM을 LIST의 끝에 삽입 */
 
-/* List removal. */
-struct list_elem *list_remove(struct list_elem *);  /* Removes ELEM from its list and returns the element that followed it. */
-struct list_elem *list_pop_front(struct list *);  /* Removes the front element from LIST and returns it. */
-struct list_elem *list_pop_back(struct list *);  /* Removes the back element from LIST and returns it. */
+/* 리스트 제거 */
+struct list_elem *list_remove(struct list_elem *);  /* ELEM을 리스트에서 제거하고 그 다음 요소 반환 */
+struct list_elem *list_pop_front(struct list *);  /* LIST의 첫 번째 요소 제거 후 반환 */
+struct list_elem *list_pop_back(struct list *);  /* LIST의 마지막 요소 제거 후 반환 */
 
-/* List elements. */
-struct list_elem *list_front(struct list *);  /* Returns the front element in LIST. */
-struct list_elem *list_back(struct list *);  /* Returns the back element in LIST. */
+/* 리스트 요소 */
+struct list_elem *list_front(struct list *);  /* LIST의 첫 번째 요소 반환 */
+struct list_elem *list_back(struct list *);  /* LIST의 마지막 요소 반환 */
 
-/* List properties. */
-size_t list_size(struct list *);  /* Returns the number of elements in LIST. */
-bool list_empty(struct list *);  /* Returns true if LIST is empty, false otherwise. */
+/* 리스트 속성 */
+size_t list_size(struct list *);  /* LIST의 요소 개수 반환 */
+bool list_empty(struct list *);  /* LIST가 비어있으면 true, 아니면 false 반환 */
 
-/* Miscellaneous. */
-void list_reverse(struct list *);  /* Reverses the order of LIST. */
+/* 기타 */
+void list_reverse(struct list *);  /* LIST의 순서를 뒤집음 */
 
-/* Compares the value of two list elements A and B, given
-   auxiliary data AUX.  Returns true if A is less than B, or
-   false if A is greater than or equal to B. */
+/* 두 리스트 요소 A와 B의 값을 비교하는 함수 타입
+   A가 B보다 작으면 true, 크거나 같으면 false 반환 */
 typedef bool list_less_func(const struct list_elem *a,
-							const struct list_elem *b, void *aux);
+                            const struct list_elem *b, void *aux);
 
-/* Operations on lists with ordered elements. */
-void list_sort(struct list *, list_less_func *, void *aux);  /* Sorts LIST according to LESS given auxiliary data AUX. */
+/* 정렬된 요소를 가진 리스트에 대한 연산 */
+void list_sort(struct list *, list_less_func *, void *aux);  /* LIST를 LESS 함수에 따라 정렬 */
 void list_insert_ordered(struct list *, struct list_elem *,
-                         list_less_func *, void *aux);  /* Inserts ELEM in the proper position in LIST, according to LESS given auxiliary data AUX. */
+                         list_less_func *, void *aux);  /* ELEM을 LIST의 적절한 위치에 삽입 */
 void list_unique(struct list *, struct list *duplicates,
-                 list_less_func *, void *aux);  /* Removes duplicate elements from LIST. */
+                 list_less_func *, void *aux);  /* LIST에서 중복 요소 제거 */
 
-/* Max and min. */
-struct list_elem *list_max(struct list *, list_less_func *, void *aux);  /* Returns the element with the largest value in LIST. */
-struct list_elem *list_min(struct list *, list_less_func *, void *aux);  /* Returns the element with the smallest value in LIST. */
+/* 최대값과 최소값 */
+struct list_elem *list_max(struct list *, list_less_func *, void *aux);  /* LIST에서 가장 큰 값을 가진 요소 반환 */
+struct list_elem *list_min(struct list *, list_less_func *, void *aux);  /* LIST에서 가장 작은 값을 가진 요소 반환 */
 
 #endif /* lib/kernel/list.h */
