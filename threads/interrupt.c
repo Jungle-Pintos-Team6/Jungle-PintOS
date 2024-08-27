@@ -124,30 +124,47 @@ enum intr_level intr_set_level(enum intr_level level) {
 	return level == INTR_ON ? intr_enable() : intr_disable();
 }
 
-/* Enables interrupts and returns the previous interrupt status. */
+/* 인터럽트를 활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_enable(void) {
-	enum intr_level old_level = intr_get_level();
-	ASSERT(!intr_context());
+    // 현재 인터럽트 레벨을 저장
+    enum intr_level old_level = intr_get_level();
+    
+    // 현재 인터럽트 컨텍스트 내에 있지 않은지 확인
+    // 인터럽트 핸들러 내에서 이 함수를 호출하면 안 됨
+    ASSERT(!intr_context());
 
-	/* Enable interrupts by setting the interrupt flag.
+    /* 인터럽트 플래그를 설정하여 인터럽트를 활성화합니다.
 
-	   See [IA32-v2b] "STI" and [IA32-v3a] 5.8.1 "Masking Maskable
-	   Hardware Interrupts". */
-	asm volatile("sti");
+       참조: [IA32-v2b] "STI" 명령어 설명과
+       [IA32-v3a] 5.8.1 "마스크 가능한 하드웨어 인터럽트 마스킹" 섹션 */
+    
+    // STI (Set Interrupt Flag) 명령어를 실행
+    // 이 명령어는 EFLAGS 레지스터의 IF(Interrupt Flag)를 1로 설정
+    // volatile 키워드는 컴파일러 최적화를 방지하여 항상 이 명령어가 실행되도록 함
+    asm volatile("sti");
 
-	return old_level;
+    // 이전 인터럽트 상태 반환
+    return old_level;
 }
 
-/* Disables interrupts and returns the previous interrupt status. */
+/* 인터럽트를 비활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_disable(void) {
-	enum intr_level old_level = intr_get_level();
+    // 현재 인터럽트 레벨을 저장
+    enum intr_level old_level = intr_get_level();
 
-	/* Disable interrupts by clearing the interrupt flag.
-	   See [IA32-v2b] "CLI" and [IA32-v3a] 5.8.1 "Masking Maskable
-	   Hardware Interrupts". */
-	asm volatile("cli" : : : "memory");
+    /* 인터럽트 플래그를 클리어하여 인터럽트를 비활성화합니다.
+       참조: [IA32-v2b] "CLI" 명령어 설명과
+       [IA32-v3a] 5.8.1 "마스크 가능한 하드웨어 인터럽트 마스킹" 섹션 */
+    
+    // CLI (Clear Interrupt Flag) 명령어를 실행
+    // 이 명령어는 EFLAGS 레지스터의 IF(Interrupt Flag)를 0으로 설정
+    // volatile 키워드는 컴파일러 최적화를 방지하여 항상 이 명령어가 실행되도록 함
+    // "memory" 제약 조건은 컴파일러에게 메모리 내용이 변경될 수 있음을 알림
+    // 이는 메모리 관련 최적화를 방지하여 올바른 동작을 보장
+    asm volatile("cli" : : : "memory");
 
-	return old_level;
+    // 이전 인터럽트 상태 반환
+    return old_level;
 }
 
 /* Initializes the interrupt system. */
