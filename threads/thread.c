@@ -183,25 +183,41 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 	return tid;
 }
 
-/* 현재 스레드를 슬립 상태로 전환 */
+/* 현재 실행 중인 스레드를 슬립(차단) 상태로 전환 */
 void thread_block(void) {
-	ASSERT(!intr_context());
-	ASSERT(intr_get_level() == INTR_OFF);
-	thread_current()->status = THREAD_BLOCKED;
-	schedule();
+    // 인터럽트 컨텍스트에서 호출되지 않았는지 확인
+    ASSERT(!intr_context());
+    // 인터럽트가 비활성화되어 있는지 확인
+    ASSERT(intr_get_level() == INTR_OFF);
+
+    // 현재 스레드의 상태를 THREAD_BLOCKED로 변경
+    thread_current()->status = THREAD_BLOCKED;
+
+    // 다른 스레드로 CPU 제어권을 넘김
+    schedule();
 }
 
 /* 차단된 스레드 T를 실행 준비 상태로 전환 */
 void thread_unblock(struct thread *t) {
-	enum intr_level old_level;
+    enum intr_level old_level;
 
-	ASSERT(is_thread(t));
+    // 매개변수 t가 유효한 스레드 구조체인지 확인
+    ASSERT(is_thread(t));
 
-	old_level = intr_disable();
-	ASSERT(t->status == THREAD_BLOCKED);
-	list_push_back(&ready_list, &t->elem);
-	t->status = THREAD_READY;
-	intr_set_level(old_level);
+    // 인터럽트를 비활성화하고 이전 상태를 저장
+    old_level = intr_disable();
+
+    // 스레드 t의 상태가 THREAD_BLOCKED인지 확인
+    ASSERT(t->status == THREAD_BLOCKED);
+
+    // 스레드 t를 ready_list의 끝에 추가
+    list_push_back(&ready_list, &t->elem);
+
+    // 스레드 t의 상태를 THREAD_READY로 변경
+    t->status = THREAD_READY;
+
+    // 이전 인터럽트 상태로 복원
+    intr_set_level(old_level);
 }
 
 /* 실행 중인 스레드의 이름 반환 */
