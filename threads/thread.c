@@ -21,7 +21,8 @@
 /* 기본 스레드를 위한 무작위 값. 수정하지 말 것 */
 #define THREAD_BASIC 0xd42df210
 
-/* THREAD_READY 상태의 프로세스 리스트, 즉 실행 준비되었지만 실제로 실행 중이지 않은 프로세스들 */
+/* THREAD_READY 상태의 프로세스 리스트, 즉 실행 준비되었지만 실제로 실행 중이지
+ * 않은 프로세스들 */
 static struct list ready_list;
 static struct list waiting_list;
 
@@ -38,12 +39,12 @@ static struct lock tid_lock;
 static struct list destruction_req;
 
 /* 통계 */
-static long long idle_ticks;   /* 유휴 상태에서 보낸 타이머 틱 수 */
+static long long idle_ticks; /* 유휴 상태에서 보낸 타이머 틱 수 */
 static long long kernel_ticks; /* 커널 스레드에서의 타이머 틱 수 */
-static long long user_ticks;   /* 사용자 프로그램에서의 타이머 틱 수 */
+static long long user_ticks; /* 사용자 프로그램에서의 타이머 틱 수 */
 
 /* 스케줄링 */
-#define TIME_SLICE 4          /* 각 스레드에 주는 타이머 틱 수 */
+#define TIME_SLICE 4		  /* 각 스레드에 주는 타이머 틱 수 */
 static unsigned thread_ticks; /* 마지막 양보 이후 타이머 틱 수 */
 
 /* false(기본값)면 라운드 로빈 스케줄러 사용
@@ -74,166 +75,193 @@ static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
 /* 스레딩 시스템 초기화 */
 void thread_init(void) {
-    ASSERT(intr_get_level() == INTR_OFF);
+	ASSERT(intr_get_level() == INTR_OFF);
 
-    /* 커널용 임시 gdt 재로드 */
-    struct desc_ptr gdt_ds = {.size = sizeof(gdt) - 1,
-                              .address = (uint64_t)gdt};
-    lgdt(&gdt_ds);
+	/* 커널용 임시 gdt 재로드 */
+	struct desc_ptr gdt_ds = {.size = sizeof(gdt) - 1,
+							  .address = (uint64_t)gdt};
+	lgdt(&gdt_ds);
 
-    /* 전역 스레드 컨텍스트 초기화 */
-    lock_init(&tid_lock);
-    list_init(&waiting_list);
-    list_init(&ready_list);
-    list_init(&destruction_req);
+	/* 전역 스레드 컨텍스트 초기화 */
+	lock_init(&tid_lock);
+	list_init(&waiting_list);
+	list_init(&ready_list);
+	list_init(&destruction_req);
 
-    /* 실행 중인 스레드를 위한 스레드 구조 설정 */
-    initial_thread = running_thread();
-    init_thread(initial_thread, "main", PRI_DEFAULT);
-    initial_thread->status = THREAD_RUNNING;
-    initial_thread->tid = allocate_tid();
+	/* 실행 중인 스레드를 위한 스레드 구조 설정 */
+	initial_thread = running_thread();
+	init_thread(initial_thread, "main", PRI_DEFAULT);
+	initial_thread->status = THREAD_RUNNING;
+	initial_thread->tid = allocate_tid();
 }
 
 /* 선점형 스레드 스케줄링 시작 */
 void thread_start(void) {
-    /* 유휴 스레드 생성 */
-    struct semaphore idle_started;
-    sema_init(&idle_started, 0);
-    thread_create("idle", PRI_MIN, idle, &idle_started);
+	/* 세마포어 선언: idle 스레드의 초기화 완료를 동기화하기 위해 사용 */
+	struct semaphore idle_started;
 
-    /* 선점형 스레드 스케줄링 시작 */
-    intr_enable();
+	/* 세마포어 초기화: 초기값을 0으로 설정 */
+	/* 이는 idle 스레드가 초기화를 완료할 때까지 메인 스레드가 대기하도록 함 */
+	sema_init(&idle_started, 0);
 
-    /* 유휴 스레드가 idle_thread를 초기화할 때까지 대기 */
-    sema_down(&idle_started);
+	/* idle 스레드 생성
+	 * "idle": 스레드 이름
+	 * PRI_MIN: 최소 우선순위로 설정 (CPU가 다른 할 일이 없을 때만 실행됨)
+	 * idle: 실행할 함수
+	 * &idle_started: 세마포어 전달 (idle 함수 내에서 초기화 완료 시 signal을
+	 * 보내기 위해)
+	 */
+	thread_create("idle", PRI_MIN, idle, &idle_started);
+
+	/* 선점형 스레드 스케줄링 시작
+	 * 인터럽트를 활성화하여 스레드 간 컨텍스트 스위칭이 가능하게 함
+	 */
+	intr_enable();
+
+	/* idle 스레드가 초기화를 완료할 때까지 대기
+	 * idle 스레드가 sema_up을 호출할 때까지 이 지점에서 블록됨
+	 * 이는 idle 스레드가 완전히 준비된 후에 다음 단계로 진행하기 위함
+	 */
+	sema_down(&idle_started);
 }
 
 /* 타이머 인터럽트 핸들러에 의해 각 타이머 틱마다 호출 */
 void thread_tick(void) {
-    struct thread *t = thread_current();
+	struct thread *t = thread_current();
 
-    /* 통계 업데이트 */
-    if (t == idle_thread)
-        idle_ticks++;
+	/* 통계 업데이트 */
+	if (t == idle_thread)
+		idle_ticks++;
 #ifdef USERPROG
-    else if (t->pml4 != NULL)
-        user_ticks++;
+	else if (t->pml4 != NULL)
+		user_ticks++;
 #endif
-    else
-        kernel_ticks++;
+	else
+		kernel_ticks++;
 
-    /* 선점 강제 */
-    if (++thread_ticks >= TIME_SLICE)
-        intr_yield_on_return();
+	/* 선점 강제 */
+	if (++thread_ticks >= TIME_SLICE)
+		intr_yield_on_return();
 }
 
 /* 스레드 통계 출력 */
 void thread_print_stats(void) {
-    printf("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
-           idle_ticks, kernel_ticks, user_ticks);
+	printf("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
+		   idle_ticks, kernel_ticks, user_ticks);
 }
 
 /* 새 커널 스레드 생성 */
 tid_t thread_create(const char *name, int priority, thread_func *function,
-                    void *aux) {
-    struct thread *t;
-    tid_t tid;
+					void *aux) {
+	struct thread *t;
+	tid_t tid;
 
-    ASSERT(function != NULL);
+	ASSERT(function != NULL);
 
-    /* 스레드 할당 */
-    t = palloc_get_page(PAL_ZERO);
-    if (t == NULL)
-        return TID_ERROR;
+	/* 스레드 할당 */
+	t = palloc_get_page(PAL_ZERO);
+	if (t == NULL)
+		return TID_ERROR;
 
-    /* 스레드 초기화 */
-    init_thread(t, name, priority);
-    tid = t->tid = allocate_tid();
+	/* 스레드 초기화 */
+	init_thread(t, name, priority);
+	tid = t->tid = allocate_tid();
 
-    /* 커널 스레드 설정 */
-    t->tf.rip = (uintptr_t)kernel_thread;
-    t->tf.R.rdi = (uint64_t)function;
-    t->tf.R.rsi = (uint64_t)aux;
-    t->tf.ds = SEL_KDSEG;
-    t->tf.es = SEL_KDSEG;
-    t->tf.ss = SEL_KDSEG;
-    t->tf.cs = SEL_KCSEG;
-    t->tf.eflags = FLAG_IF;
+	/* 커널 스레드 설정 */
+	t->tf.rip = (uintptr_t)kernel_thread;
+	t->tf.R.rdi = (uint64_t)function;
+	t->tf.R.rsi = (uint64_t)aux;
+	t->tf.ds = SEL_KDSEG;
+	t->tf.es = SEL_KDSEG;
+	t->tf.ss = SEL_KDSEG;
+	t->tf.cs = SEL_KCSEG;
+	t->tf.eflags = FLAG_IF;
 
-    /* 실행 큐에 추가 */
-    thread_unblock(t);
+	/* 실행 큐에 추가 */
+	thread_unblock(t);
 
-    return tid;
+	return tid;
 }
 
 /* 현재 스레드를 슬립 상태로 전환 */
 void thread_block(void) {
-    ASSERT(!intr_context());
-    ASSERT(intr_get_level() == INTR_OFF);
-    thread_current()->status = THREAD_BLOCKED;
-    schedule();
+	ASSERT(!intr_context());
+	ASSERT(intr_get_level() == INTR_OFF);
+	thread_current()->status = THREAD_BLOCKED;
+	schedule();
 }
 
 /* 차단된 스레드 T를 실행 준비 상태로 전환 */
 void thread_unblock(struct thread *t) {
-    enum intr_level old_level;
+	enum intr_level old_level;
 
-    ASSERT(is_thread(t));
+	ASSERT(is_thread(t));
 
-    old_level = intr_disable();
-    ASSERT(t->status == THREAD_BLOCKED);
-    list_push_back(&ready_list, &t->elem);
-    t->status = THREAD_READY;
-    intr_set_level(old_level);
+	old_level = intr_disable();
+	ASSERT(t->status == THREAD_BLOCKED);
+	list_push_back(&ready_list, &t->elem);
+	t->status = THREAD_READY;
+	intr_set_level(old_level);
 }
 
 /* 실행 중인 스레드의 이름 반환 */
-const char *thread_name(void) {
-    return thread_current()->name;
-}
+const char *thread_name(void) { return thread_current()->name; }
 
 /* 실행 중인 스레드 반환 */
 struct thread *thread_current(void) {
-    struct thread *t = running_thread();
-    
-    /* T가 실제 스레드인지 확인 */
-    ASSERT(is_thread(t));
-    ASSERT(t->status == THREAD_RUNNING);
+	struct thread *t = running_thread();
 
-    return t;
+	/* T가 실제 스레드인지 확인 */
+	ASSERT(is_thread(t));
+	ASSERT(t->status == THREAD_RUNNING);
+
+	return t;
 }
 
-/* 실행 중인 스레드의 tid 반환 */
-tid_t thread_tid(void) {
-    return thread_current()->tid;
-}
-
-/* 현재 스레드 스케줄 해제 및 소멸 */
 void thread_exit(void) {
-    ASSERT(!intr_context());
+	ASSERT(!intr_context());
+	// 현재 코드가 인터럽트 컨텍스트에서 실행되고 있지 않음을 확인합니다.
+	// 인터럽트 핸들러 내에서 스레드를 종료시키는 것은 안전하지 않기 때문에,
+	// 이 ASSERT문으로 확인합니다.
 
 #ifdef USERPROG
-    process_exit();
+	process_exit();
 #endif
+	// USERPROG이 정의되어 있을 경우, 현재 프로세스와 관련된 자원 정리 및 종료를
+	// 수행하는 process_exit() 함수를 호출합니다. 이 부분은 주로 사용자
+	// 프로그램의 종료 처리를 담당합니다.
 
-    /* 상태를 THREAD_DYING으로 설정하고 다른 프로세스 스케줄 */
-    intr_disable();
-    do_schedule(THREAD_DYING);
-    NOT_REACHED();
+	/* 상태를 THREAD_DYING으로 설정하고 다른 프로세스 스케줄 */
+	intr_disable();
+	// 인터럽트를 비활성화합니다. 스레드 종료 과정에서는 컨텍스트 스위칭이
+	// 일어나거나 다른 인터럽트가 발생하면 안 되므로, 이를 방지하기 위해
+	// 인터럽트를 비활성화합니다.
+
+	do_schedule(THREAD_DYING);
+	// 현재 스레드의 상태를 THREAD_DYING으로 설정하고, 다른 스레드를
+	// 스케줄링합니다. do_schedule() 함수는 스레드의 상태를 변경하고, CPU에서
+	// 실행할 다른 스레드를 선택하여 스위칭을 수행합니다. THREAD_DYING 상태가 된
+	// 스레드는 이후에 스케줄러에 의해 완전히 소멸될 것입니다.
+
+	NOT_REACHED();
+	// 이 코드는 도달할 수 없는 지점이어야 합니다.
+	// do_schedule() 함수 호출 이후에는 컨트롤이 현재 스레드로 돌아오지 않기
+	// 때문에, 이 라인에 도달하면 안 됩니다. 만약 이 지점에 도달했다면, 이는
+	// 심각한 오류입니다.
 }
 
 /* CPU 양보. 현재 스레드는 슬립 상태가 아니며 즉시 다시 스케줄될 수 있음 */
 void thread_yield(void) {
-    struct thread *curr = thread_current();
-    enum intr_level old_level;
+	struct thread *curr = thread_current();
+	enum intr_level old_level;
 
-    ASSERT(!intr_context());
+	ASSERT(!intr_context());
 
-    old_level = intr_disable();
-    if (curr != idle_thread)
-        list_push_back(&ready_list, &curr->elem);
-    do_schedule(THREAD_READY);
-    intr_set_level(old_level);
+	old_level = intr_disable();
+	if (curr != idle_thread)
+		list_push_back(&ready_list, &curr->elem);
+	do_schedule(THREAD_READY);
+	intr_set_level(old_level);
 }
 
 void thread_sleep(int64_t ticks) {
