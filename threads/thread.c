@@ -344,41 +344,39 @@ int thread_get_recent_cpu(void) {
 	return 0;
 }
 
-/* Idle thread.  Executes when no other thread is ready to run.
-
-   The idle thread is initially put on the ready list by
-   thread_start().  It will be scheduled once initially, at which
-   point it initializes idle_thread, "up"s the semaphore passed
-   to it to enable thread_start() to continue, and immediately
-   blocks.  After that, the idle thread never appears in the
-   ready list.  It is returned by next_thread_to_run() as a
-   special case when the ready list is empty. */
+/* idle 스레드 함수. 다른 실행 가능한 스레드가 없을 때 실행됨 */
+/* 이 함수는 thread_start()에 의해 생성된 새 스레드에서 실행됨 */
 static void idle(void *idle_started_ UNUSED) {
+	// 전달받은 세마포어를 로컬 변수에 저장
 	struct semaphore *idle_started = idle_started_;
 
-	// idle_thread 초기화
+	/*
+	 * 현재 이 함수를 실행 중인 스레드(즉, 새로 생성된 idle 스레드)의 포인터를
+	 * 글로벌 idle_thread 변수에 저장
+	 * 이를 통해 시스템은 idle 스레드를 식별하고 접근할 수 있게 됨
+	 */
 	idle_thread = thread_current();
-	// thread_start() 계속 실행을 위한 세마포어 신호
+
+	// idle 스레드 초기화 완료를 알리는 세마포어 신호
+	// 이로써 thread_start() 함수가 계속 진행될 수 있음
 	sema_up(idle_started);
 
+	// 무한 루프: idle 스레드의 주 실행 부분
 	for (;;) {
 		/* 다른 스레드에게 실행 기회 양보 */
+		// 인터럽트 비활성화
 		intr_disable();
+
+		// 현재 스레드(idle 스레드)를 차단 상태로 전환
+		// 이는 다른 실행 가능한 스레드가 있다면 그 스레드에게 CPU를 양보하기
+		// 위함
 		thread_block();
 
-		/* Re-enable interrupts and wait for the next one.
-
-		   The `sti' instruction disables interrupts until the
-		   completion of the next instruction, so these two
-		   instructions are executed atomically.  This atomicity is
-		   important; otherwise, an interrupt could be handled
-		   between re-enabling interrupts and waiting for the next
-		   one to occur, wasting as much as one clock tick worth of
-		   time.
-
-		   See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
-		   7.11.1 "HLT Instruction". */
 		// 인터럽트 재활성화 및 다음 인터럽트 대기
+		// sti: 인터럽트 활성화, hlt: CPU를 대기 상태로 전환
+		// 두 명령어가 원자적으로 실행되어 중간에 인터럽트 발생 방지
+		// 이는 CPU를 절전 모드로 전환하여 전력을 절약하고,
+		// 동시에 다음 인터럽트(즉, 다음 작업)에 즉시 응답할 수 있게 함
 		asm volatile("sti; hlt" : : : "memory");
 	}
 }
