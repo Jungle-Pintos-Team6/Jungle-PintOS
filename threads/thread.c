@@ -185,39 +185,39 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
 /* 현재 실행 중인 스레드를 슬립(차단) 상태로 전환 */
 void thread_block(void) {
-    // 인터럽트 컨텍스트에서 호출되지 않았는지 확인
-    ASSERT(!intr_context());
-    // 인터럽트가 비활성화되어 있는지 확인
-    ASSERT(intr_get_level() == INTR_OFF);
+	// 인터럽트 컨텍스트에서 호출되지 않았는지 확인
+	ASSERT(!intr_context());
+	// 인터럽트가 비활성화되어 있는지 확인
+	ASSERT(intr_get_level() == INTR_OFF);
 
-    // 현재 스레드의 상태를 THREAD_BLOCKED로 변경
-    thread_current()->status = THREAD_BLOCKED;
+	// 현재 스레드의 상태를 THREAD_BLOCKED로 변경
+	thread_current()->status = THREAD_BLOCKED;
 
-    // 다른 스레드로 CPU 제어권을 넘김
-    schedule();
+	// 다른 스레드로 CPU 제어권을 넘김
+	schedule();
 }
 
 /* 차단된 스레드 T를 실행 준비 상태로 전환 */
 void thread_unblock(struct thread *t) {
-    enum intr_level old_level;
+	enum intr_level old_level;
 
-    // 매개변수 t가 유효한 스레드 구조체인지 확인
-    ASSERT(is_thread(t));
+	// 매개변수 t가 유효한 스레드 구조체인지 확인
+	ASSERT(is_thread(t));
 
-    // 인터럽트를 비활성화하고 이전 상태를 저장
-    old_level = intr_disable();
+	// 인터럽트를 비활성화하고 이전 상태를 저장
+	old_level = intr_disable();
 
-    // 스레드 t의 상태가 THREAD_BLOCKED인지 확인
-    ASSERT(t->status == THREAD_BLOCKED);
+	// 스레드 t의 상태가 THREAD_BLOCKED인지 확인
+	ASSERT(t->status == THREAD_BLOCKED);
 
-    // 스레드 t를 ready_list의 끝에 추가
-    list_push_back(&ready_list, &t->elem);
+	// 스레드 t를 ready_list의 끝에 추가
+	list_push_back(&ready_list, &t->elem);
 
-    // 스레드 t의 상태를 THREAD_READY로 변경
-    t->status = THREAD_READY;
+	// 스레드 t의 상태를 THREAD_READY로 변경
+	t->status = THREAD_READY;
 
-    // 이전 인터럽트 상태로 복원
-    intr_set_level(old_level);
+	// 이전 인터럽트 상태로 복원
+	intr_set_level(old_level);
 }
 
 /* 실행 중인 스레드의 이름 반환 */
@@ -268,16 +268,20 @@ void thread_exit(void) {
 
 /* CPU 양보. 현재 스레드는 슬립 상태가 아니며 즉시 다시 스케줄될 수 있음 */
 void thread_yield(void) {
-	struct thread *curr = thread_current();
+	struct thread *curr = thread_current(); // 현재 실행 중인 스레드 포인터 획득
 	enum intr_level old_level;
 
-	ASSERT(!intr_context());
+	ASSERT(!intr_context()); // 인터럽트 컨텍스트가 아님을 확인
 
-	old_level = intr_disable();
-	if (curr != idle_thread)
-		list_push_back(&ready_list, &curr->elem);
-	do_schedule(THREAD_READY);
-	intr_set_level(old_level);
+	old_level = intr_disable(); // 인터럽트 비활성화 및 이전 인터럽트 레벨 저장
+
+	if (curr != idle_thread) // 현재 스레드가 idle 스레드가 아니면
+		list_push_back(&ready_list,
+					   &curr->elem); // ready_list 끝에 현재 스레드 추가
+
+	do_schedule(THREAD_READY); // 스케줄러 호출, 현재 스레드 상태를 READY로 설정
+
+	intr_set_level(old_level); // 이전 인터럽트 레벨 복원
 }
 
 void thread_sleep(int64_t ticks) {
@@ -352,11 +356,13 @@ int thread_get_recent_cpu(void) {
 static void idle(void *idle_started_ UNUSED) {
 	struct semaphore *idle_started = idle_started_;
 
+	// idle_thread 초기화
 	idle_thread = thread_current();
+	// thread_start() 계속 실행을 위한 세마포어 신호
 	sema_up(idle_started);
 
 	for (;;) {
-		/* Let someone else run. */
+		/* 다른 스레드에게 실행 기회 양보 */
 		intr_disable();
 		thread_block();
 
@@ -372,39 +378,46 @@ static void idle(void *idle_started_ UNUSED) {
 
 		   See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
 		   7.11.1 "HLT Instruction". */
+		// 인터럽트 재활성화 및 다음 인터럽트 대기
 		asm volatile("sti; hlt" : : : "memory");
 	}
 }
 
-/* Function used as the basis for a kernel thread. */
+/* 커널 스레드의 기본 함수 */
 static void kernel_thread(thread_func *function, void *aux) {
 	ASSERT(function != NULL);
 
-	intr_enable(); /* The scheduler runs with interrupts off. */
-	function(aux); /* Execute the thread function. */
-	thread_exit(); /* If function() returns, kill the thread. */
+	intr_enable(); // 인터럽트 활성화
+	function(aux); // 스레드 함수 실행
+	thread_exit(); // 함수 종료 시 스레드 종료
 }
 
-/* Does basic initialization of T as a blocked thread named
-   NAME. */
+/* 스레드 T를 NAME과 PRIORITY로 초기화 */
 static void init_thread(struct thread *t, const char *name, int priority) {
+	// 스레드 구조체 포인터가 NULL이 아닌지 확인
 	ASSERT(t != NULL);
+	// 우선순위가 유효한 범위 내에 있는지 확인
 	ASSERT(PRI_MIN <= priority && priority <= PRI_MAX);
+	// 이름 문자열이 NULL이 아닌지 확인
 	ASSERT(name != NULL);
 
+	// 스레드 구조체를 0으로 초기화
 	memset(t, 0, sizeof *t);
+	// 스레드 상태를 BLOCKED로 설정
 	t->status = THREAD_BLOCKED;
+	// 스레드 이름을 설정 (최대 길이 제한)
 	strlcpy(t->name, name, sizeof t->name);
+	// 스레드의 스택 포인터 초기화 (페이지 맨 위에서 시작)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
+	// 스레드 우선순위 설정
 	t->priority = priority;
+	// 디버깅을 위한 매직 넘버 설정
 	t->magic = THREAD_MAGIC;
 }
 
-/* Chooses and returns the next thread to be scheduled.  Should
-   return a thread from the run queue, unless the run queue is
-   empty.  (If the running thread can continue running, then it
-   will be in the run queue.)  If the run queue is empty, return
-   idle_thread. */
+/* 다음에 실행할 스레드 선택
+   실행 큐가 비어있지 않으면 큐에서 스레드 반환
+   비어있으면 idle_thread 반환 */
 static struct thread *next_thread_to_run(void) {
 	if (list_empty(&ready_list))
 		return idle_thread;
