@@ -59,9 +59,11 @@ static void init_thread(struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule(void);
 static tid_t allocate_tid(void);
-void thread_sleep(int64_t ticks);
-void thread_wakeup(int64_t ticks);
-
+void wait_thread(int64_t ticks);
+void wakeup_thread(int64_t ticks);
+bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
+				   void *aux UNUSED);
+				   
 /* 유효한 스레드를 가리키는지 확인 */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -284,33 +286,41 @@ void thread_yield(void) {
 	intr_set_level(old_level); // 이전 인터럽트 레벨 복원
 }
 
-void thread_sleep(int64_t ticks) {
+void wait_thread(int64_t ticks) {
 	struct thread *cur;
 	enum intr_level old_level;
 
-	old_level = intr_disable(); // 인터럽트 off
 	cur = thread_current();
-
-	ASSERT(cur != idle_thread);
-
-	cur->wakeup_time = ticks;				   // 일어날 시간을 저장
-	list_push_back(&waiting_list, &cur->elem); // sleep_list 에 추가
-	thread_block();							   // block 상태로 변경
-
-	intr_set_level(old_level); // 인터럽트 on
+	cur->wakeup_time = ticks;
+    
+	old_level = intr_disable();
+	list_insert_ordered(&waiting_list,&cur->elem,compare_ticks,NULL);
+	thread_block();
+	intr_set_level(old_level);
 }
 
-void thread_wakeup(int64_t ticks) {
-	struct list_elem *e = list_begin(&waiting_list);
+bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
+				   void *aux UNUSED) {
+	struct thread *a_ = list_entry(a, struct thread, elem);
+	struct thread *b_ = list_entry(b, struct thread, elem);
+	return a_->wakeup_time < b_->wakeup_time;
+}
 
-	while (e != list_end(&waiting_list)) {
-		struct thread *t = list_entry(e, struct thread, elem);
-		if (t->wakeup_time <= ticks) { // 스레드가 일어날 시간이 되었는지 확인
-			e = list_remove(e); // sleep list 에서 제거
-			thread_unblock(t);	// 스레드 unblock
-		} else
-			e = list_next(e);
-	}
+void wakeup_thread(int64_t ticks) {
+    enum intr_level old_level;
+    old_level = intr_disable();
+
+    while (!list_empty(&waiting_list)) {
+        struct thread *t = list_entry(list_front(&waiting_list), struct thread, elem);
+        if (t->wakeup_time <= ticks) {
+            list_pop_front(&waiting_list);
+            thread_unblock(t);
+        } else {
+            break;
+        }
+    }
+
+    intr_set_level(old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
