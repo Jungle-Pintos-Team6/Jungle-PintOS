@@ -147,5 +147,9 @@ void thread_wait(int64_t ticks);
 void wake_thread(int64_t current_tick);
 bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 				   void *aux UNUSED);
-
+bool priority_thread(const struct list_elem *a, const struct list_elem *b,
+					 void *aux UNUSED);
+void priority_yield(void);
+bool priority_thread_cond(const struct list_elem *a, const struct list_elem *b,
+						  void *aux UNUSED);
 #endif /* threads/thread.h */
