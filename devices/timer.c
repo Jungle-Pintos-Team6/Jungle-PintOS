@@ -85,7 +85,7 @@ int64_t timer_elapsed(int64_t then) { return timer_ticks() - then; }
 void timer_sleep(int64_t ticks) {
 	int64_t start = timer_ticks();
 
-	wait_thread(start + ticks);
+	thread_wait(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -105,7 +105,7 @@ void timer_print_stats(void) {
 /* Timer interrupt handler. */
 static void timer_interrupt(struct intr_frame *args UNUSED) {
 	ticks++;
-	wakeup_thread(ticks);
+	thread_wakeup(ticks);
 	thread_tick();
 }
 

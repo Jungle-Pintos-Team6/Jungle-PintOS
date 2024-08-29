@@ -59,8 +59,8 @@ static void init_thread(struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule(void);
 static tid_t allocate_tid(void);
-void wait_thread(int64_t ticks);
-void wakeup_thread(int64_t ticks);
+void thread_wait(int64_t ticks);
+void thread_wakeup(int64_t ticks);
 bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 				   void *aux UNUSED);
 				   
@@ -286,7 +286,7 @@ void thread_yield(void) {
 	intr_set_level(old_level); // 이전 인터럽트 레벨 복원
 }
 
-void wait_thread(int64_t ticks) {
+void thread_wait(int64_t ticks) {
 	struct thread *cur;
 	enum intr_level old_level;
 
@@ -306,7 +306,7 @@ bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 	return a_->wakeup_time < b_->wakeup_time;
 }
 
-void wakeup_thread(int64_t ticks) {
+void thread_wakeup(int64_t ticks) {
     enum intr_level old_level;
     old_level = intr_disable();
 
