@@ -32,425 +32,356 @@
    operations, which can be valuable.) */
 
 static bool is_sorted(struct list_elem *a, struct list_elem *b,
-					  list_less_func *less, void *aux) UNUSED;
+                      list_less_func *less, void *aux) UNUSED;
+// a에서 b까지 리스트 요소 정렬 확인 함수
+// UNUSED: 컴파일러에 함수 미사용 가능성 알림
 
-/* Returns true if ELEM is a head, false otherwise. */
+/* ELEM이 헤드인지 확인 */
 static inline bool is_head(struct list_elem *elem) {
-	return elem != NULL && elem->prev == NULL && elem->next != NULL;
+    return elem != NULL && elem->prev == NULL && elem->next != NULL;
 }
+// elem이 NULL 아님, 이전 요소 없음, 다음 요소 있음 확인
 
-/* Returns true if ELEM is an interior element,
-   false otherwise. */
+/* ELEM이 내부 요소인지 확인 */
 static inline bool is_interior(struct list_elem *elem) {
-	return elem != NULL && elem->prev != NULL && elem->next != NULL;
+    return elem != NULL && elem->prev != NULL && elem->next != NULL;
 }
+// elem이 NULL 아님, 이전 및 다음 요소 모두 있음 확인
 
-/* Returns true if ELEM is a tail, false otherwise. */
+/* ELEM이 꼬리인지 확인 */
 static inline bool is_tail(struct list_elem *elem) {
-	return elem != NULL && elem->prev != NULL && elem->next == NULL;
+    return elem != NULL && elem->prev != NULL && elem->next == NULL;
 }
+// elem이 NULL 아님, 이전 요소 있음, 다음 요소 없음 확인
 
-/* Initializes LIST as an empty list. */
+/* LIST를 빈 리스트로 초기화 */
 void list_init(struct list *list) {
-	ASSERT(list != NULL);
-	list->head.prev = NULL;
-	list->head.next = &list->tail;
-	list->tail.prev = &list->head;
-	list->tail.next = NULL;
+    ASSERT(list != NULL);
+    list->head.prev = NULL;
+    list->head.next = &list->tail;
+    list->tail.prev = &list->head;
+    list->tail.next = NULL;
 }
+// 헤드와 꼬리 초기화, 서로 연결
 
-/* Returns the beginning of LIST.  */
+/* LIST의 시작 반환 */
 struct list_elem *list_begin(struct list *list) {
-	ASSERT(list != NULL);
-	return list->head.next;
+    ASSERT(list != NULL);
+    return list->head.next;
 }
+// 첫 번째 요소(헤드 다음) 반환
 
-/* Returns the element after ELEM in its list.  If ELEM is the
-   last element in its list, returns the list tail.  Results are
-   undefined if ELEM is itself a list tail. */
+/* ELEM 다음 요소 반환 */
 struct list_elem *list_next(struct list_elem *elem) {
-	ASSERT(is_head(elem) || is_interior(elem));
-	return elem->next;
+    ASSERT(is_head(elem) || is_interior(elem));
+    return elem->next;
 }
+// 다음 요소 반환, 헤드나 내부 요소에만 사용
 
-/* Returns LIST's tail.
-
-   list_end() is often used in iterating through a list from
-   front to back.  See the big comment at the top of list.h for
-   an example. */
+/* LIST의 꼬리 반환 */
 struct list_elem *list_end(struct list *list) {
-	ASSERT(list != NULL);
-	return &list->tail;
+    ASSERT(list != NULL);
+    return &list->tail;
 }
+// 꼬리(더미 노드) 반환
 
-/* Returns the LIST's reverse beginning, for iterating through
-   LIST in reverse order, from back to front. */
+/* LIST의 역방향 시작 반환 */
 struct list_elem *list_rbegin(struct list *list) {
-	ASSERT(list != NULL);
-	return list->tail.prev;
+    ASSERT(list != NULL);
+    return list->tail.prev;
 }
+// 마지막 유효 요소 반환
 
-/* Returns the element before ELEM in its list.  If ELEM is the
-   first element in its list, returns the list head.  Results are
-   undefined if ELEM is itself a list head. */
+/* ELEM의 이전 요소 반환 */
 struct list_elem *list_prev(struct list_elem *elem) {
-	ASSERT(is_interior(elem) || is_tail(elem));
-	return elem->prev;
+    ASSERT(is_interior(elem) || is_tail(elem));
+    return elem->prev;
 }
+// 이전 요소 반환, 내부 요소나 꼬리에만 사용
 
-/* Returns LIST's head.
-
-   list_rend() is often used in iterating through a list in
-   reverse order, from back to front.  Here's typical usage,
-   following the example from the top of list.h:
-
-   for (e = list_rbegin (&foo_list); e != list_rend (&foo_list);
-   e = list_prev (e))
-   {
-   struct foo *f = list_entry (e, struct foo, elem);
-   ...do something with f...
-   }
-   */
+/* LIST의 헤드 반환 */
 struct list_elem *list_rend(struct list *list) {
-	ASSERT(list != NULL);
-	return &list->head;
+    ASSERT(list != NULL);
+    return &list->head;
 }
+// 헤드(더미 노드) 반환
 
-/* Return's LIST's head.
-
-   list_head() can be used for an alternate style of iterating
-   through a list, e.g.:
-
-   e = list_head (&list);
-   while ((e = list_next (e)) != list_end (&list))
-   {
-   ...
-   }
-   */
+/* LIST의 헤드 반환 */
 struct list_elem *list_head(struct list *list) {
-	ASSERT(list != NULL);
-	return &list->head;
+    ASSERT(list != NULL);
+    return &list->head;
 }
+// 헤드 반환
 
-/* Return's LIST's tail. */
+/* LIST의 꼬리 반환 */
 struct list_elem *list_tail(struct list *list) {
-	ASSERT(list != NULL);
-	return &list->tail;
+    ASSERT(list != NULL);
+    return &list->tail;
 }
+// 꼬리 반환
 
-/* Inserts ELEM just before BEFORE, which may be either an
-   interior element or a tail.  The latter case is equivalent to
-   list_push_back(). */
+/* BEFORE 앞에 ELEM 삽입 */
 void list_insert(struct list_elem *before, struct list_elem *elem) {
-	ASSERT(is_interior(before) || is_tail(before));
-	ASSERT(elem != NULL);
+    ASSERT(is_interior(before) || is_tail(before));
+    ASSERT(elem != NULL);
 
-	elem->prev = before->prev;
-	elem->next = before;
-	before->prev->next = elem;
-	before->prev = elem;
+    elem->prev = before->prev;
+    elem->next = before;
+    before->prev->next = elem;
+    before->prev = elem;
 }
+// 새 요소 특정 위치에 삽입, 포인터 조정
 
-/* Removes elements FIRST though LAST (exclusive) from their
-   current list, then inserts them just before BEFORE, which may
-   be either an interior element or a tail. */
+/* FIRST부터 LAST(제외) 요소들 제거 후 BEFORE 앞에 삽입 */
 void list_splice(struct list_elem *before, struct list_elem *first,
-				 struct list_elem *last) {
-	ASSERT(is_interior(before) || is_tail(before));
-	if (first == last)
-		return;
-	last = list_prev(last);
+                 struct list_elem *last) {
+    ASSERT(is_interior(before) || is_tail(before));
+    if (first == last)
+        return;
+    last = list_prev(last);
 
-	ASSERT(is_interior(first));
-	ASSERT(is_interior(last));
+    ASSERT(is_interior(first));
+    ASSERT(is_interior(last));
 
-	/* Cleanly remove FIRST...LAST from its current list. */
-	first->prev->next = last->next;
-	last->next->prev = first->prev;
+    /* FIRST...LAST 현재 리스트에서 제거 */
+    first->prev->next = last->next;
+    last->next->prev = first->prev;
 
-	/* Splice FIRST...LAST into new list. */
-	first->prev = before->prev;
-	last->next = before;
-	before->prev->next = first;
-	before->prev = last;
+    /* FIRST...LAST 새 리스트에 삽입 */
+    first->prev = before->prev;
+    last->next = before;
+    before->prev->next = first;
+    before->prev = last;
 }
+// 리스트 일부 다른 위치로 이동
 
-/* Inserts ELEM at the beginning of LIST, so that it becomes the
-   front in LIST. */
+/* ELEM을 LIST 시작에 삽입 */
 void list_push_front(struct list *list, struct list_elem *elem) {
-	list_insert(list_begin(list), elem);
+    list_insert(list_begin(list), elem);
 }
+// 요소를 리스트 맨 앞에 추가
 
-/* Inserts ELEM at the end of LIST, so that it becomes the
-   back in LIST. */
+/* ELEM을 LIST 끝에 삽입 */
 void list_push_back(struct list *list, struct list_elem *elem) {
-	list_insert(list_end(list), elem);
+    list_insert(list_end(list), elem);
 }
+// 요소를 리스트 맨 뒤에 추가
 
-/* Removes ELEM from its list and returns the element that
-   followed it.  Undefined behavior if ELEM is not in a list.
-
-   It's not safe to treat ELEM as an element in a list after
-   removing it.  In particular, using list_next() or list_prev()
-   on ELEM after removal yields undefined behavior.  This means
-   that a naive loop to remove the elements in a list will fail:
-
- ** DON'T DO THIS **
- for (e = list_begin (&list); e != list_end (&list); e = list_next (e))
- {
- ...do something with e...
- list_remove (e);
- }
- ** DON'T DO THIS **
-
- Here is one correct way to iterate and remove elements from a
-list:
-
-for (e = list_begin (&list); e != list_end (&list); e = list_remove (e))
-{
-...do something with e...
-}
-
-If you need to free() elements of the list then you need to be
-more conservative.  Here's an alternate strategy that works
-even in that case:
-
-while (!list_empty (&list))
-{
-struct list_elem *e = list_pop_front (&list);
-...do something with e...
-}
-*/
+/* ELEM을 리스트에서 제거하고 다음 요소 반환 */
 struct list_elem *list_remove(struct list_elem *elem) {
-	ASSERT(is_interior(elem));
-	elem->prev->next = elem->next;
-	elem->next->prev = elem->prev;
-	return elem->next;
+    ASSERT(is_interior(elem));
+    elem->prev->next = elem->next;
+    elem->next->prev = elem->prev;
+    return elem->next;
 }
+// 요소 제거 후 다음 요소 반환
 
-/* Removes the front element from LIST and returns it.
-   Undefined behavior if LIST is empty before removal. */
+/* LIST 앞 요소 제거 및 반환 */
 struct list_elem *list_pop_front(struct list *list) {
-	struct list_elem *front = list_front(list);
-	list_remove(front);
-	return front;
+    struct list_elem *front = list_front(list);
+    list_remove(front);
+    return front;
 }
+// 첫 번째 요소 제거 및 반환
 
-/* Removes the back element from LIST and returns it.
-   Undefined behavior if LIST is empty before removal. */
+/* LIST 뒤 요소 제거 및 반환 */
 struct list_elem *list_pop_back(struct list *list) {
-	struct list_elem *back = list_back(list);
-	list_remove(back);
-	return back;
+    struct list_elem *back = list_back(list);
+    list_remove(back);
+    return back;
 }
+// 마지막 요소 제거 및 반환
 
-/* Returns the front element in LIST.
-   Undefined behavior if LIST is empty. */
+/* LIST 앞 요소 반환 */
 struct list_elem *list_front(struct list *list) {
-	ASSERT(!list_empty(list));
-	return list->head.next;
+    ASSERT(!list_empty(list));
+    return list->head.next;
 }
+// 첫 번째 요소 반환
 
-/* Returns the back element in LIST.
-   Undefined behavior if LIST is empty. */
+/* LIST 뒤 요소 반환 */
 struct list_elem *list_back(struct list *list) {
-	ASSERT(!list_empty(list));
-	return list->tail.prev;
+    ASSERT(!list_empty(list));
+    return list->tail.prev;
 }
+// 마지막 요소 반환
 
-/* Returns the number of elements in LIST.
-   Runs in O(n) in the number of elements. */
+/* LIST의 요소 개수 반환 */
 size_t list_size(struct list *list) {
-	struct list_elem *e;
-	size_t cnt = 0;
+    struct list_elem *e;
+    size_t cnt = 0;
 
-	for (e = list_begin(list); e != list_end(list); e = list_next(e))
-		cnt++;
-	return cnt;
+    for (e = list_begin(list); e != list_end(list); e = list_next(e))
+        cnt++;
+    return cnt;
 }
+// O(n) 시간 복잡도로 리스트 순회하며 요소 개수 계산
 
-/* Returns true if LIST is empty, false otherwise. */
+/* LIST가 비어있는지 확인 */
 bool list_empty(struct list *list) {
-	return list_begin(list) == list_end(list);
+    return list_begin(list) == list_end(list);
 }
+// 시작과 끝이 같으면 빈 리스트
 
-/* Swaps the `struct list_elem *'s that A and B point to. */
+/* A와 B가 가리키는 포인터 교환 */
 static void swap(struct list_elem **a, struct list_elem **b) {
-	struct list_elem *t = *a;
-	*a = *b;
-	*b = t;
+    struct list_elem *t = *a;
+    *a = *b;
+    *b = t;
 }
+// 임시 변수 사용하여 포인터 값 교환
 
-/* Reverses the order of LIST. */
+/* LIST 순서 뒤집기 */
 void list_reverse(struct list *list) {
-	if (!list_empty(list)) {
-		struct list_elem *e;
+    if (!list_empty(list)) {
+        struct list_elem *e;
 
-		for (e = list_begin(list); e != list_end(list); e = e->prev)
-			swap(&e->prev, &e->next);
-		swap(&list->head.next, &list->tail.prev);
-		swap(&list->head.next->prev, &list->tail.prev->next);
-	}
+        for (e = list_begin(list); e != list_end(list); e = e->prev)
+            swap(&e->prev, &e->next);
+        swap(&list->head.next, &list->tail.prev);
+        swap(&list->head.next->prev, &list->tail.prev->next);
+    }
 }
+// 각 요소의 prev, next 포인터 교환 후 헤드와 테일 조정
 
-/* Returns true only if the list elements A through B (exclusive)
-   are in order according to LESS given auxiliary data AUX. */
+/* A부터 B까지 요소들이 LESS에 따라 정렬되어 있는지 확인 */
 static bool is_sorted(struct list_elem *a, struct list_elem *b,
-					  list_less_func *less, void *aux) {
-	if (a != b)
-		while ((a = list_next(a)) != b)
-			if (less(a, list_prev(a), aux))
-				return false;
-	return true;
+                      list_less_func *less, void *aux) {
+    if (a != b)
+        while ((a = list_next(a)) != b)
+            if (less(a, list_prev(a), aux))
+                return false;
+    return true;
 }
+// 연속된 요소 쌍 비교하여 정렬 상태 확인
 
-/* Finds a run, starting at A and ending not after B, of list
-   elements that are in nondecreasing order according to LESS
-   given auxiliary data AUX.  Returns the (exclusive) end of the
-   run.
-   A through B (exclusive) must form a non-empty range. */
+/* A에서 시작하여 B를 넘지 않는 범위에서 비감소 순서의 연속된 요소들 찾기 */
 static struct list_elem *find_end_of_run(struct list_elem *a,
-										 struct list_elem *b,
-										 list_less_func *less, void *aux) {
-	ASSERT(a != NULL);
-	ASSERT(b != NULL);
-	ASSERT(less != NULL);
-	ASSERT(a != b);
+                                         struct list_elem *b,
+                                         list_less_func *less, void *aux) {
+    ASSERT(a != NULL);
+    ASSERT(b != NULL);
+    ASSERT(less != NULL);
+    ASSERT(a != b);
 
-	do {
-		a = list_next(a);
-	} while (a != b && !less(a, list_prev(a), aux));
-	return a;
+    do {
+        a = list_next(a);
+    } while (a != b && !less(a, list_prev(a), aux));
+    return a;
 }
+// 연속된 비감소 순서의 요소들 끝 지점 찾기
 
-/* Merges A0 through A1B0 (exclusive) with A1B0 through B1
-   (exclusive) to form a combined range also ending at B1
-   (exclusive).  Both input ranges must be nonempty and sorted in
-   nondecreasing order according to LESS given auxiliary data
-   AUX.  The output range will be sorted the same way. */
+/* A0부터 A1B0까지와 A1B0부터 B1까지 병합 */
 static void inplace_merge(struct list_elem *a0, struct list_elem *a1b0,
-						  struct list_elem *b1, list_less_func *less,
-						  void *aux) {
-	ASSERT(a0 != NULL);
-	ASSERT(a1b0 != NULL);
-	ASSERT(b1 != NULL);
-	ASSERT(less != NULL);
-	ASSERT(is_sorted(a0, a1b0, less, aux));
-	ASSERT(is_sorted(a1b0, b1, less, aux));
+                          struct list_elem *b1, list_less_func *less,
+                          void *aux) {
+    ASSERT(a0 != NULL);
+    ASSERT(a1b0 != NULL);
+    ASSERT(b1 != NULL);
+    ASSERT(less != NULL);
+    ASSERT(is_sorted(a0, a1b0, less, aux));
+    ASSERT(is_sorted(a1b0, b1, less, aux));
 
-	while (a0 != a1b0 && a1b0 != b1)
-		if (!less(a1b0, a0, aux))
-			a0 = list_next(a0);
-		else {
-			a1b0 = list_next(a1b0);
-			list_splice(a0, list_prev(a1b0), a1b0);
-		}
+    while (a0 != a1b0 && a1b0 != b1)
+        if (!less(a1b0, a0, aux))
+            a0 = list_next(a0);
+        else {
+            a1b0 = list_next(a1b0);
+            list_splice(a0, list_prev(a1b0), a1b0);
+        }
 }
+// 두 정렬된 부분 리스트 병합
 
-/* Sorts LIST according to LESS given auxiliary data AUX, using a
-   natural iterative merge sort that runs in O(n lg n) time and
-   O(1) space in the number of elements in LIST. */
+/* LIST를 LESS에 따라 정렬 */
 void list_sort(struct list *list, list_less_func *less, void *aux) {
-	size_t output_run_cnt; /* Number of runs output in current pass. */
+    size_t output_run_cnt;
 
-	ASSERT(list != NULL);
-	ASSERT(less != NULL);
+    ASSERT(list != NULL);
+    ASSERT(less != NULL);
 
-	/* Pass over the list repeatedly, merging adjacent runs of
-	   nondecreasing elements, until only one run is left. */
-	do {
-		struct list_elem *a0;   /* Start of first run. */
-		struct list_elem *a1b0; /* End of first run, start of second. */
-		struct list_elem *b1;   /* End of second run. */
+    do {
+        struct list_elem *a0;
+        struct list_elem *a1b0;
+        struct list_elem *b1;
 
-		output_run_cnt = 0;
-		for (a0 = list_begin(list); a0 != list_end(list); a0 = b1) {
-			/* Each iteration produces one output run. */
-			output_run_cnt++;
+        output_run_cnt = 0;
+        for (a0 = list_begin(list); a0 != list_end(list); a0 = b1) {
+            output_run_cnt++;
 
-			/* Locate two adjacent runs of nondecreasing elements
-			   A0...A1B0 and A1B0...B1. */
-			a1b0 = find_end_of_run(a0, list_end(list), less, aux);
-			if (a1b0 == list_end(list))
-				break;
-			b1 = find_end_of_run(a1b0, list_end(list), less, aux);
+            a1b0 = find_end_of_run(a0, list_end(list), less, aux);
+            if (a1b0 == list_end(list))
+                break;
+            b1 = find_end_of_run(a1b0, list_end(list), less, aux);
 
-			/* Merge the runs. */
-			inplace_merge(a0, a1b0, b1, less, aux);
-		}
-	} while (output_run_cnt > 1);
+            inplace_merge(a0, a1b0, b1, less, aux);
+        }
+    } while (output_run_cnt > 1);
 
-	ASSERT(is_sorted(list_begin(list), list_end(list), less, aux));
+    ASSERT(is_sorted(list_begin(list), list_end(list), less, aux));
 }
+// 자연 병합 정렬 구현, O(n log n) 시간, O(1) 공간 복잡도
 
-/* Inserts ELEM in the proper position in LIST, which must be
-   sorted according to LESS given auxiliary data AUX.
-   Runs in O(n) average case in the number of elements in LIST. */
+/* ELEM을 LIST의 적절한 위치에 삽입 */
 void list_insert_ordered(struct list *list, struct list_elem *elem,
-						 list_less_func *less, void *aux) {
-	struct list_elem *e;
+                         list_less_func *less, void *aux) {
+    struct list_elem *e;
 
-	ASSERT(list != NULL);
-	ASSERT(elem != NULL);
-	ASSERT(less != NULL);
+    ASSERT(list != NULL);
+    ASSERT(elem != NULL);
+    ASSERT(less != NULL);
 
-	for (e = list_begin(list); e != list_end(list); e = list_next(e))
-		if (less(elem, e, aux))
-			break;
-	return list_insert(e, elem);
+    for (e = list_begin(list); e != list_end(list); e = list_next(e))
+        if (less(elem, e, aux))
+            break;
+    return list_insert(e, elem);
 }
+// 정렬된 리스트에 새 요소 삽입, 평균 O(n) 시간 복잡도
 
-/* Iterates through LIST and removes all but the first in each
-   set of adjacent elements that are equal according to LESS
-   given auxiliary data AUX.  If DUPLICATES is non-null, then the
-   elements from LIST are appended to DUPLICATES. */
+/* LIST에서 중복 요소 제거 */
 void list_unique(struct list *list, struct list *duplicates,
-				 list_less_func *less, void *aux) {
-	struct list_elem *elem, *next;
+                 list_less_func *less, void *aux) {
+    struct list_elem *elem, *next;
 
-	ASSERT(list != NULL);
-	ASSERT(less != NULL);
-	if (list_empty(list))
-		return;
+    ASSERT(list != NULL);
+    ASSERT(less != NULL);
+    if (list_empty(list))
+        return;
 
-	elem = list_begin(list);
-	while ((next = list_next(elem)) != list_end(list))
-		if (!less(elem, next, aux) && !less(next, elem, aux)) {
-			list_remove(next);
-			if (duplicates != NULL)
-				list_push_back(duplicates, next);
-		} else
-			elem = next;
+    elem = list_begin(list);
+    while ((next = list_next(elem)) != list_end(list))
+        if (!less(elem, next, aux) && !less(next, elem, aux)) {
+            list_remove(next);
+            if (duplicates != NULL)
+                list_push_back(duplicates, next);
+        } else
+            elem = next;
 }
+// 인접한 중복 요소 제거, 옵션으로 중복 요소 별도 리스트에 저장
 
-/* Returns the element in LIST with the largest value according
-   to LESS given auxiliary data AUX.  If there is more than one
-   maximum, returns the one that appears earlier in the list.  If
-   the list is empty, returns its tail. */
+/* LIST에서 최대값 요소 반환 */
 struct list_elem *list_max(struct list *list, list_less_func *less, void *aux) {
-	struct list_elem *max = list_begin(list);
-	if (max != list_end(list)) {
-		struct list_elem *e;
+    struct list_elem *max = list_begin(list);
+    if (max != list_end(list)) {
+        struct list_elem *e;
 
-		for (e = list_next(max); e != list_end(list); e = list_next(e))
-			if (less(max, e, aux))
-				max = e;
-	}
-	return max;
+        for (e = list_next(max); e != list_end(list); e = list_next(e))
+            if (less(max, e, aux))
+                max = e;
+    }
+    return max;
 }
+// 리스트 순회하며 최대값 요소 찾기
 
-/* Returns the element in LIST with the smallest value according
-   to LESS given auxiliary data AUX.  If there is more than one
-   minimum, returns the one that appears earlier in the list.  If
-   the list is empty, returns its tail. */
+/* LIST에서 최소값 요소 반환 */
 struct list_elem *list_min(struct list *list, list_less_func *less, void *aux) {
-	struct list_elem *min = list_begin(list);
-	if (min != list_end(list)) {
-		struct list_elem *e;
+    struct list_elem *min = list_begin(list);
+    if (min != list_end(list)) {
+        struct list_elem *e;
 
-		for (e = list_next(min); e != list_end(list); e = list_next(e))
-			if (less(e, min, aux))
-				min = e;
-	}
-	return min;
+        for (e = list_next(min); e != list_end(list); e = list_next(e))
+            if (less(e, min, aux))
+                min = e;
+    }
+    return min;
 }
+// 리스트 순회하며 최소값 요소 찾기

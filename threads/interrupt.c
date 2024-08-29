@@ -34,7 +34,7 @@
    Interrupt-Handler Procedure" for discussion. */
 
 struct gate {
-	unsigned off_15_0 : 16;  // low 16 bits of offset in segment
+	unsigned off_15_0 : 16;	 // low 16 bits of offset in segment
 	unsigned ss : 16;		 // segment selector
 	unsigned ist : 3;		 // # args, 0 for interrupt/trap gates
 	unsigned rsv1 : 5;		 // reserved(should be zero I guess)
@@ -62,7 +62,7 @@ static struct desc_ptr idt_desc = {.size = sizeof(idt) - 1,
 		ASSERT((d) >= 0 && (d) <= 3);                                          \
 		ASSERT((t) >= 0 && (t) <= 15);                                         \
 		*(g) = (struct gate){                                                  \
-			.off_15_0 = (uint64_t)(function)&0xffff,                           \
+			.off_15_0 = (uint64_t)(function) & 0xffff,                         \
 			.ss = SEL_KCSEG,                                                   \
 			.ist = 0,                                                          \
 			.rsv1 = 0,                                                         \
@@ -105,16 +105,28 @@ static void pic_end_of_interrupt(int irq);
 /* Interrupt handlers. */
 void intr_handler(struct intr_frame *args);
 
-/* Returns the current interrupt status. */
+/* 현재 인터럽트 상태를 반환합니다. */
 enum intr_level intr_get_level(void) {
+	// 64비트 정수형 변수 flags 선언
+	// 이 변수는 프로세서의 RFLAGS 레지스터 값을 저장할 것입니다.
 	uint64_t flags;
 
-	/* Push the flags register on the processor stack, then pop the
-	   value off the stack into `flags'.  See [IA32-v2b] "PUSHF"
-	   and "POP" and [IA32-v3a] 5.8.1 "Masking Maskable Hardware
-	   Interrupts". */
+	/* 프로세서의 플래그 레지스터를 스택에 푸시한 다음,
+	   그 값을 스택에서 팝하여 'flags' 변수에 저장합니다.
+	   참조: [IA32-v2b] "PUSHF" 및 "POP" 명령어 설명과
+	   [IA32-v3a] 5.8.1 "마스크 가능한 하드웨어 인터럽트 마스킹" 섹션 */
+
+	// 인라인 어셈블리 코드 실행
+	// "pushfq" : RFLAGS 레지스터의 값을 스택에 푸시
+	// "popq %0" : 스택의 최상위 값을 팝하여 flags 변수에 저장
+	// "=g"(flags) : 결과를 flags 변수에 저장하라는 제약 조건
+	// volatile : 컴파일러가 이 코드를 최적화하거나 재배치하지 않도록 함
 	asm volatile("pushfq; popq %0" : "=g"(flags));
 
+	// RFLAGS 레지스터의 IF(Interrupt Flag) 비트를 확인
+	// FLAG_IF와 비트 AND 연산을 수행하여 IF 비트가 설정되어 있는지 확인
+	// IF 비트가 1이면 인터럽트가 활성화된 상태(INTR_ON)
+	// IF 비트가 0이면 인터럽트가 비활성화된 상태(INTR_OFF)
 	return flags & FLAG_IF ? INTR_ON : INTR_OFF;
 }
 
@@ -124,29 +136,47 @@ enum intr_level intr_set_level(enum intr_level level) {
 	return level == INTR_ON ? intr_enable() : intr_disable();
 }
 
-/* Enables interrupts and returns the previous interrupt status. */
+/* 인터럽트를 활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_enable(void) {
+	// 현재 인터럽트 레벨을 저장
 	enum intr_level old_level = intr_get_level();
+
+	// 현재 인터럽트 컨텍스트 내에 있지 않은지 확인
+	// 인터럽트 핸들러 내에서 이 함수를 호출하면 안 됨
 	ASSERT(!intr_context());
 
-	/* Enable interrupts by setting the interrupt flag.
+	/* 인터럽트 플래그를 설정하여 인터럽트를 활성화합니다.
 
-	   See [IA32-v2b] "STI" and [IA32-v3a] 5.8.1 "Masking Maskable
-	   Hardware Interrupts". */
+	   참조: [IA32-v2b] "STI" 명령어 설명과
+	   [IA32-v3a] 5.8.1 "마스크 가능한 하드웨어 인터럽트 마스킹" 섹션 */
+
+	// STI (Set Interrupt Flag) 명령어를 실행
+	// 이 명령어는 EFLAGS 레지스터의 IF(Interrupt Flag)를 1로 설정
+	// volatile 키워드는 컴파일러 최적화를 방지하여 항상 이 명령어가 실행되도록
+	// 함
 	asm volatile("sti");
 
+	// 이전 인터럽트 상태 반환
 	return old_level;
 }
 
-/* Disables interrupts and returns the previous interrupt status. */
+/* 인터럽트를 비활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_disable(void) {
+	// 현재 인터럽트 레벨을 저장
 	enum intr_level old_level = intr_get_level();
 
-	/* Disable interrupts by clearing the interrupt flag.
-	   See [IA32-v2b] "CLI" and [IA32-v3a] 5.8.1 "Masking Maskable
-	   Hardware Interrupts". */
+	/* 인터럽트 플래그를 클리어하여 인터럽트를 비활성화합니다.
+	   참조: [IA32-v2b] "CLI" 명령어 설명과
+	   [IA32-v3a] 5.8.1 "마스크 가능한 하드웨어 인터럽트 마스킹" 섹션 */
+
+	// CLI (Clear Interrupt Flag) 명령어를 실행
+	// 이 명령어는 EFLAGS 레지스터의 IF(Interrupt Flag)를 0으로 설정
+	// volatile 키워드는 컴파일러 최적화를 방지하여 항상 이 명령어가 실행되도록
+	// 함 "memory" 제약 조건은 컴파일러에게 메모리 내용이 변경될 수 있음을 알림
+	// 이는 메모리 관련 최적화를 방지하여 올바른 동작을 보장
 	asm volatile("cli" : : : "memory");
 
+	// 이전 인터럽트 상태 반환
 	return old_level;
 }
 
