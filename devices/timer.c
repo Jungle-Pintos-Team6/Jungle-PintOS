@@ -105,8 +105,8 @@ void timer_print_stats(void) {
 /* Timer interrupt handler. */
 static void timer_interrupt(struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_tick();
 	wakeup_thread(ticks);
+	thread_tick();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
