@@ -308,7 +308,6 @@ bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 
 void thread_wakeup(int64_t ticks) {
     enum intr_level old_level;
-    old_level = intr_disable();
 
     while (!list_empty(&waiting_list)) {
         struct thread *t = list_entry(list_front(&waiting_list), struct thread, elem);
@@ -319,8 +318,6 @@ void thread_wakeup(int64_t ticks) {
             break;
         }
     }
-
-    intr_set_level(old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
