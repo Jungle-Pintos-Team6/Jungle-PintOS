@@ -63,7 +63,9 @@ void thread_wait(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 				   void *aux UNUSED);
-				   
+bool compare_priority(const struct list_elem *a, const struct list_elem *b,
+					  void *aux UNUSED);
+
 /* 유효한 스레드를 가리키는지 확인 */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -103,15 +105,16 @@ void thread_start(void) {
 	struct semaphore idle_started;
 
 	/* 세마포어 초기화: 초기값을 0으로 설정 */
-	/* 이는 idle 스레드가 초기화를 완료할 때까지 메인 스레드가 대기하도록 함 */
+	/* 이는 idle 스레드가 초기화를 완료할 때까지 메인 스레드가 대기하도록 함
+	 */
 	sema_init(&idle_started, 0);
 
 	/* idle 스레드 생성
 	 * "idle": 스레드 이름
 	 * PRI_MIN: 최소 우선순위로 설정 (CPU가 다른 할 일이 없을 때만 실행됨)
 	 * idle: 실행할 함수
-	 * &idle_started: 세마포어 전달 (idle 함수 내에서 초기화 완료 시 signal을
-	 * 보내기 위해)
+	 * &idle_started: 세마포어 전달 (idle 함수 내에서 초기화 완료 시
+	 * signal을 보내기 위해)
 	 */
 	thread_create("idle", PRI_MIN, idle, &idle_started);
 
@@ -245,9 +248,9 @@ void thread_exit(void) {
 #ifdef USERPROG
 	process_exit();
 #endif
-	// USERPROG이 정의되어 있을 경우, 현재 프로세스와 관련된 자원 정리 및 종료를
-	// 수행하는 process_exit() 함수를 호출합니다. 이 부분은 주로 사용자
-	// 프로그램의 종료 처리를 담당합니다.
+	// USERPROG이 정의되어 있을 경우, 현재 프로세스와 관련된 자원 정리 및
+	// 종료를 수행하는 process_exit() 함수를 호출합니다. 이 부분은 주로
+	// 사용자 프로그램의 종료 처리를 담당합니다.
 
 	/* 상태를 THREAD_DYING으로 설정하고 다른 프로세스 스케줄 */
 	intr_disable();
@@ -257,9 +260,10 @@ void thread_exit(void) {
 
 	do_schedule(THREAD_DYING);
 	// 현재 스레드의 상태를 THREAD_DYING으로 설정하고, 다른 스레드를
-	// 스케줄링합니다. do_schedule() 함수는 스레드의 상태를 변경하고, CPU에서
-	// 실행할 다른 스레드를 선택하여 스위칭을 수행합니다. THREAD_DYING 상태가 된
-	// 스레드는 이후에 스케줄러에 의해 완전히 소멸될 것입니다.
+	// 스케줄링합니다. do_schedule() 함수는 스레드의 상태를 변경하고,
+	// CPU에서 실행할 다른 스레드를 선택하여 스위칭을 수행합니다.
+	// THREAD_DYING 상태가 된 스레드는 이후에 스케줄러에 의해 완전히 소멸될
+	// 것입니다.
 
 	NOT_REACHED();
 	// 이 코드는 도달할 수 없는 지점이어야 합니다.
@@ -292,9 +296,9 @@ void thread_wait(int64_t ticks) {
 
 	cur = thread_current();
 	cur->wakeup_time = ticks;
-    
+
 	old_level = intr_disable();
-	list_insert_ordered(&waiting_list,&cur->elem,compare_ticks,NULL);
+	list_insert_ordered(&waiting_list, &cur->elem, compare_ticks, NULL);
 	thread_block();
 	intr_set_level(old_level);
 }
@@ -303,26 +307,40 @@ bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 				   void *aux UNUSED) {
 	struct thread *a_ = list_entry(a, struct thread, elem);
 	struct thread *b_ = list_entry(b, struct thread, elem);
-	return a_->wakeup_time < b_->wakeup_time;
+	return a_->wakeup_time > b_->wakeup_time;
 }
 
 void thread_wakeup(int64_t ticks) {
-    enum intr_level old_level;
+	enum intr_level old_level;
 
-    while (!list_empty(&waiting_list)) {
-        struct thread *t = list_entry(list_front(&waiting_list), struct thread, elem);
-        if (t->wakeup_time <= ticks) {
-            list_pop_front(&waiting_list);
-            thread_unblock(t);
-        } else {
-            break;
-        }
-    }
+	while (!list_empty(&waiting_list)) {
+		struct thread *t =
+			list_entry(list_front(&waiting_list), struct thread, elem);
+		if (t->wakeup_time <= ticks) {
+			list_pop_front(&waiting_list);
+			thread_unblock(t);
+		} else {
+			break;
+		}
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
-	thread_current()->priority = new_priority;
+	enum intr_level old_level;
+	struct thread *curr = thread_current();
+	curr->priority = new_priority;
+
+	old_level = intr_disable();
+	list_sort(&ready_list,compare_priority,NULL);
+	intr_set_level(old_level);
+}
+
+bool compare_priority(const struct list_elem *a, const struct list_elem *b,
+					  void *aux UNUSED) {
+	struct thread *a_ = list_entry(a, struct thread, elem);
+	struct thread *b_ = list_entry(b, struct thread, elem);
+	return a_->priority > b_->priority;
 }
 
 /* Returns the current thread's priority. */
@@ -358,9 +376,9 @@ static void idle(void *idle_started_ UNUSED) {
 	struct semaphore *idle_started = idle_started_;
 
 	/*
-	 * 현재 이 함수를 실행 중인 스레드(즉, 새로 생성된 idle 스레드)의 포인터를
-	 * 글로벌 idle_thread 변수에 저장
-	 * 이를 통해 시스템은 idle 스레드를 식별하고 접근할 수 있게 됨
+	 * 현재 이 함수를 실행 중인 스레드(즉, 새로 생성된 idle 스레드)의
+	 * 포인터를 글로벌 idle_thread 변수에 저장 이를 통해 시스템은 idle
+	 * 스레드를 식별하고 접근할 수 있게 됨
 	 */
 	idle_thread = thread_current();
 
@@ -375,8 +393,8 @@ static void idle(void *idle_started_ UNUSED) {
 		intr_disable();
 
 		// 현재 스레드(idle 스레드)를 차단 상태로 전환
-		// 이는 다른 실행 가능한 스레드가 있다면 그 스레드에게 CPU를 양보하기
-		// 위함
+		// 이는 다른 실행 가능한 스레드가 있다면 그 스레드에게 CPU를
+		// 양보하기 위함
 		thread_block();
 
 		// 인터럽트 재활성화 및 다음 인터럽트 대기
