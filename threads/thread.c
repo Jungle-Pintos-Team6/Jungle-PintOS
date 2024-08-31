@@ -183,8 +183,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
 	/* 실행 큐에 추가 */
 	thread_unblock(t);
-
-	if (priority > thread_current()->priority) {
+	if (t->priority > thread_current()->priority) {
 		thread_yield();
 	}
 
@@ -219,7 +218,7 @@ void thread_unblock(struct thread *t) {
 	ASSERT(t->status == THREAD_BLOCKED);
 
 	// 스레드 t를 ready_list의 끝에 추가
-	list_insert_ordered(&ready_list, &t->elem,compare_priority,NULL);
+	list_insert_ordered(&ready_list, &t->elem, compare_priority, NULL);
 
 	// 스레드 t의 상태를 THREAD_READY로 변경
 	t->status = THREAD_READY;
@@ -313,8 +312,6 @@ bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 }
 
 void thread_wakeup(int64_t ticks) {
-	enum intr_level old_level;
-
 	while (!list_empty(&waiting_list)) {
 		struct thread *t =
 			list_entry(list_front(&waiting_list), struct thread, elem);
@@ -328,8 +325,11 @@ void thread_wakeup(int64_t ticks) {
 }
 
 void thread_set_priority(int new_priority) {
+	int old_priority = thread_current()->priority;
 	thread_current()->priority = new_priority;
-	thread_yield();
+	if (new_priority < old_priority) {
+		thread_yield();
+	}
 }
 
 bool compare_priority(const struct list_elem *a, const struct list_elem *b,
