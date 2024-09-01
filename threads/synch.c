@@ -237,6 +237,7 @@ bool lock_held_by_current_thread(const struct lock *lock) {
 struct semaphore_elem {
 	struct list_elem elem;		/* List element. */
 	struct semaphore semaphore; /* This semaphore. */
+	int priority;
 };
 
 /* Initializes condition variable COND.  A condition variable
@@ -246,6 +247,12 @@ void cond_init(struct condition *cond) {
 	ASSERT(cond != NULL);
 
 	list_init(&cond->waiters);
+}
+
+bool sema_priority_compare(struct list_elem *a,struct list_elem *b){
+    struct semaphore_elem *sa = list_entry(a, struct semaphore_elem, elem);
+    struct semaphore_elem *sb = list_entry(b, struct semaphore_elem, elem);
+    return sa->priority > sb->priority;
 }
 
 /* Atomically releases LOCK and waits for COND to be signaled by
@@ -277,7 +284,8 @@ void cond_wait(struct condition *cond, struct lock *lock) {
 	ASSERT(lock_held_by_current_thread(lock));
 
 	sema_init(&waiter.semaphore, 0);
-	list_push_back(&cond->waiters, &waiter.elem);
+	waiter.priority = thread_get_priority();
+	list_insert_ordered(&cond->waiters, &waiter.elem,sema_priority_compare,NULL);
 	lock_release(lock);
 	sema_down(&waiter.semaphore);
 	lock_acquire(lock);
