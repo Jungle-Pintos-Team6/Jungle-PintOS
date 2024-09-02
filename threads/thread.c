@@ -432,6 +432,8 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	// 디버깅을 위한 매직 넘버 설정
 	t->magic = THREAD_MAGIC;
+	
+	t->initial_priority = priority;
 }
 
 /* 다음에 실행할 스레드 선택
