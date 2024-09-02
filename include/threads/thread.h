@@ -100,6 +100,8 @@ struct thread {
 	struct list_elem elem; /* 리스트 요소. 스레드를 여러 리스트(예:
 							  ready_list)에 넣을 때 사용 */
 
+	int initial_priority;
+
 #ifdef USERPROG
 	/* userprog/process.c에 의해 관리되는 필드 */
 	uint64_t
