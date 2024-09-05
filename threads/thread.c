@@ -183,9 +183,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 
 	/* 실행 큐에 추가 */
 	thread_unblock(t);
-	if (t->priority > thread_current()->priority) {
-		thread_yield();
-	}
+	thread_yield_as_priority();
 
 	return tid;
 }
@@ -273,6 +271,17 @@ void thread_exit(void) {
 	// 심각한 오류입니다.
 }
 
+void thread_yield_as_priority(void) {
+	struct thread *current = thread_current();
+	struct thread *ready =
+		list_entry(list_begin(&ready_list), struct thread, elem);
+	if (current == idle_thread)
+		if (current == idle_thread || list_empty(&ready_list))
+			return;
+	if (current->priority < ready->priority)
+		thread_yield();
+}
+
 /* CPU 양보. 현재 스레드는 슬립 상태가 아니며 즉시 다시 스케줄될 수 있음 */
 void thread_yield(void) {
 	struct thread *curr = thread_current(); // 현재 실행 중인 스레드 포인터 획득
@@ -325,32 +334,45 @@ void thread_wakeup(int64_t ticks) {
 }
 
 void refresh_priority(void) {
-    struct thread *current = thread_current();
-    current->priority = current->initial_priority;
-    
-    if (!list_empty(&current->donations)) {
-        struct thread *max_priority_donor = list_entry(
-            list_max(&current->donations, compare_priority, NULL),
-            struct thread, donation_elem
-        );
-        if (max_priority_donor->priority > current->priority) {
-            current->priority = max_priority_donor->priority;
-        }
-    }
+	struct thread *current = thread_current();
+	current->priority = current->initial_priority;
+
+	if (!list_empty(&current->donations)) {
+		struct thread *max_priority_donor =
+			list_entry(list_max(&current->donations, compare_priority, NULL),
+					   struct thread, donation_elem);
+		if (max_priority_donor->priority > current->priority) {
+			current->priority = max_priority_donor->priority;
+		}
+	}
 }
 
 void thread_test_preemption(void) {
-    if (!list_empty(&ready_list) && thread_current()->priority <
-        list_entry(list_front(&ready_list), struct thread, elem)->priority) {
-        thread_yield();
-    }
+	if (!list_empty(&ready_list) &&
+		thread_current()->priority <
+			list_entry(list_front(&ready_list), struct thread, elem)
+				->priority) {
+		thread_yield();
+	}
 }
 
 void thread_set_priority(int new_priority) {
-	thread_current()->initial_priority = new_priority;
+	enum intr_level old_level = intr_disable();
 
-	refresh_priority();
-	thread_test_preemption();
+	struct thread *current = thread_current();
+	int old_priority = current->priority;
+
+	current->initial_priority = new_priority;
+
+	if (list_empty(&current->donations) || new_priority > current->priority) {
+		current->priority = new_priority;
+	}
+
+	if (new_priority < old_priority) {
+		thread_yield_as_priority();
+	}
+
+	intr_set_level(old_level);
 }
 
 bool compare_priority(const struct list_elem *a, const struct list_elem *b,
