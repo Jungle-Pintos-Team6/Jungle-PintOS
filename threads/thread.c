@@ -308,7 +308,7 @@ void thread_set_priority(int new_priority) {
 	struct thread *current = thread_current();
 	int old_priority = current->priority;
 
-	current->original_priority = new_priority;
+	current->initial_priority = new_priority;
 
 	if (list_empty(&current->donations) || new_priority > current->priority) {
 		current->priority = new_priority;
@@ -406,8 +406,8 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
-	t->original_priority = priority;
-	t->waiting_lock = NULL;
+	t->initial_priority = priority;
+	t->wakeup_time = NULL;
 	list_init(&(t->donations));
 }
 
@@ -591,7 +591,7 @@ void thread_wait(int64_t ticks) {
 
 	current = thread_current();
 	ASSERT(current != idle_thread);
-	current->wake_ticks = ticks;
+	current->wakeup_time = ticks;
 	old_level = intr_disable();
 	list_insert_ordered(&wait_list, &current->elem, compare_ticks, NULL);
 	thread_block();
@@ -602,7 +602,7 @@ bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 				   void *aux UNUSED) {
 	struct thread *a_ = list_entry(a, struct thread, elem);
 	struct thread *b_ = list_entry(b, struct thread, elem);
-	return a_->wake_ticks < b_->wake_ticks;
+	return a_->wakeup_time < b_->wakeup_time;
 }
 
 void thread_wake(int64_t current_tick) {
@@ -613,7 +613,7 @@ void thread_wake(int64_t current_tick) {
 	current_elem = list_begin(&wait_list);
 	while (current_elem != list_end(&wait_list)) {
 		current_thread = list_entry(current_elem, struct thread, elem);
-		if (current_tick >= current_thread->wake_ticks) {
+		if (current_tick >= current_thread->wakeup_time) {
 			current_elem = list_remove(current_elem);
 			thread_unblock(current_thread);
 			thread_yield_as_priority();
@@ -638,10 +638,10 @@ void thread_donate_priority(void) {
 	struct thread *holder;
 	int priority = current->priority;
 	for (int i = 0; i < 8; i++) {
-		if (current->waiting_lock == NULL) {
+		if (current->wait_on_lock == NULL) {
 			return;
 		}
-		holder = current->waiting_lock->holder;
+		holder = current->wait_on_lock->holder;
 		holder->priority = priority;
 		current = holder;
 	}
@@ -659,7 +659,7 @@ void thread_remove_donor(struct lock *lock) {
 	donor_elem = list_front(donations);
 	while (1) {
 		donor_thread = list_entry(donor_elem, struct thread, donation_elem);
-		if (donor_thread->waiting_lock == lock) {
+		if (donor_thread->wait_on_lock == lock) {
 			list_remove(&donor_thread->donation_elem);
 		}
 		donor_elem = list_next(donor_elem);
@@ -675,7 +675,7 @@ void thread_reset_priority(void) {
 	struct thread *donations_root;
 
 	if (list_empty(donations)) {
-		current->priority = current->original_priority;
+		current->priority = current->initial_priority;
 		return;
 	}
 
