@@ -90,10 +90,14 @@ struct thread {
 	enum thread_status status; /* Thread state. */
 	char name[16];			   /* Name (for debugging purposes). */
 	int priority;			   /* Priority. */
+	int original_priority;
 	int64_t wake_ticks;
+	struct lock *waiting_lock;
+	struct list donations;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
+	struct list_elem donation_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -144,12 +148,17 @@ int thread_get_load_avg(void);
 void do_iret(struct intr_frame *tf);
 
 void thread_wait(int64_t ticks);
-void wake_thread(int64_t current_tick);
+void thread_wake(int64_t current_tick);
 bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
 				   void *aux UNUSED);
-bool priority_thread(const struct list_elem *a, const struct list_elem *b,
-					 void *aux UNUSED);
-void priority_yield(void);
-bool priority_thread_cond(const struct list_elem *a, const struct list_elem *b,
-						  void *aux UNUSED);
+bool compare_thread_priority(const struct list_elem *a,
+							 const struct list_elem *b, void *aux UNUSED);
+void thread_yield_as_priority(void);
+bool compare_thread_priority_cond(const struct list_elem *a,
+								  const struct list_elem *b, void *aux UNUSED);
+bool compare_donation_priority(const struct list_elem *a,
+							   const struct list_elem *b, void *aus UNUSED);
+void thread_donate_priority(void);
+void thread_remove_donor(struct lock *lock);
+void thread_reset_priority(void);
 #endif /* threads/thread.h */

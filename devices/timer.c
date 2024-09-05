@@ -105,7 +105,7 @@ void timer_print_stats(void) {
 /* Timer interrupt handler. */
 static void timer_interrupt(struct intr_frame *args UNUSED) {
 	ticks++;
-	wake_thread(ticks);
+	thread_wake(ticks);
 	thread_tick();
 }
 
