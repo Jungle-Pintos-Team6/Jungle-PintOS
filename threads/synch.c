@@ -182,14 +182,14 @@ void lock_acquire(struct lock *lock) {
 
 	struct thread *current = thread_current();
 	if (lock->holder != NULL) {
-		current->waiting_lock = lock;
+		current->wait_on_lock = lock;
 		list_insert_ordered(&lock->holder->donations, &current->donation_elem,
 							compare_donation_priority, NULL);
 		thread_donate_priority();
 	}
 
 	sema_down(&lock->semaphore);
-	current->waiting_lock = NULL;
+	current->wait_on_lock = NULL;
 	lock->holder = thread_current();
 }
 

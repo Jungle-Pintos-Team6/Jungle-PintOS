@@ -101,10 +101,10 @@ struct thread {
 							  ready_list)에 넣을 때 사용 */
 
 	int initial_priority;
-	
+
 	struct lock *wait_on_lock;
-    struct list donations;
-    struct list_elem donation_elem;
+	struct list donations;
+	struct list_elem donation_elem;
 
 #ifdef USERPROG
 	/* userprog/process.c에 의해 관리되는 필드 */
@@ -144,7 +144,10 @@ void thread_unblock(struct thread *);
 struct thread *thread_current(void);
 tid_t thread_tid(void);
 const char *thread_name(void);
-
+bool compare_ticks(const struct list_elem *a, const struct list_elem *b,
+				   void *aux UNUSED);
+bool compare_thread_priority(const struct list_elem *a,
+							 const struct list_elem *b, void *aux UNUSED);
 void thread_exit(void) NO_RETURN;
 void thread_yield(void);
 
@@ -157,5 +160,12 @@ int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
 void do_iret(struct intr_frame *tf);
+bool compare_donation_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+void thread_wake(int64_t current_tick);
+void thread_wait(int64_t ticks);
+void thread_yield_as_priority(void);
+void thread_donate_priority(void);
+void thread_remove_donor(struct lock *lock);
+void thread_reset_priority(void);
 
 #endif /* threads/thread.h */
