@@ -324,12 +324,33 @@ void thread_wakeup(int64_t ticks) {
 	}
 }
 
+void refresh_priority(void) {
+    struct thread *current = thread_current();
+    current->priority = current->initial_priority;
+    
+    if (!list_empty(&current->donations)) {
+        struct thread *max_priority_donor = list_entry(
+            list_max(&current->donations, compare_priority, NULL),
+            struct thread, donation_elem
+        );
+        if (max_priority_donor->priority > current->priority) {
+            current->priority = max_priority_donor->priority;
+        }
+    }
+}
+
+void thread_test_preemption(void) {
+    if (!list_empty(&ready_list) && thread_current()->priority <
+        list_entry(list_front(&ready_list), struct thread, elem)->priority) {
+        thread_yield();
+    }
+}
+
 void thread_set_priority(int new_priority) {
-	int old_priority = thread_current()->priority;
-	thread_current()->priority = new_priority;
-	if (new_priority < old_priority) {
-		thread_yield();
-	}
+	thread_current()->initial_priority = new_priority;
+
+	refresh_priority();
+	thread_test_preemption();
 }
 
 bool compare_priority(const struct list_elem *a, const struct list_elem *b,
@@ -432,8 +453,12 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	// 디버깅을 위한 매직 넘버 설정
 	t->magic = THREAD_MAGIC;
-	
+
 	t->initial_priority = priority;
+
+	t->wait_on_lock = NULL;
+
+	list_init(&t->donations);
 }
 
 /* 다음에 실행할 스레드 선택
