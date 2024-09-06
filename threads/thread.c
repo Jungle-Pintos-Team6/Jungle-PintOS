@@ -627,10 +627,13 @@ void thread_yield_as_priority(void) {
 	struct thread *current = thread_current();
 	struct thread *ready =
 		list_entry(list_begin(&ready_list), struct thread, elem);
-	if (current == idle_thread || list_empty(&ready_list))
+	if (current == idle_thread)
 		return;
 	if (current->priority < ready->priority)
-		thread_yield();
+		if (intr_context())
+			intr_yield_on_return();
+		else
+			thread_yield();
 }
 
 void thread_donate_priority(void) {
