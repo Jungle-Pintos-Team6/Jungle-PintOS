@@ -10,5 +10,5 @@ check_expected ([<<'EOF']);
 (args) argv[2] = null
 (args) end
 args-single: exit(0)
-EOF
+EO
 pass;

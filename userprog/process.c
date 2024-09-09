@@ -166,6 +166,8 @@ int process_exec(void *f_name) {
 	/* We first kill the current context */
 	process_cleanup();
 
+	printf("process_exec 에 넘어온 f_name : %s\n",f_name);
+
 	/* And then load the binary */
 	success = load(file_name, &_if);
 
@@ -174,6 +176,8 @@ int process_exec(void *f_name) {
 	if (!success)
 		return -1;
 
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+	printf("패싱 넘겼다..\n");
 	/* Start switched process. */
 	do_iret(&_if);
 	NOT_REACHED();
@@ -192,7 +196,12 @@ int process_wait(tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	return -1;
+	while (1)
+	{
+		/* code */
+	}
+	
+	// return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -312,12 +321,35 @@ static bool load(const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
-
+	printf("load에서 file_name : %p\n",(void*)file_name);
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate(thread_current());
+
+	char *argv[64];
+	int argc = 0;
+	char *token;
+	char *save_ptr;
+
+	printf("------------%p-------------\n",if_);
+
+	token = strtok_r(file_name," ",&save_ptr);
+	while (token != NULL)
+	{
+		printf("토큰 %d: %s\n", argc, token);
+		argv[argc] = token;
+		token = strtok_r(NULL," ",&save_ptr);
+		argc++;
+	}
+
+    printf("argv 리스트 내용:\n");
+    for (i = 0; i < argc; i++) {
+        printf("argv[%d]: %s\n", i, argv[i]);
+    }
+    printf("Total arguments: %d\n", argc);
+	printf("load 함수에서 file_name : %s\n ----토큰화 종료-----\n",file_name);
 
 	/* Open executable file. */
 	file = filesys_open(file_name);
@@ -397,6 +429,39 @@ static bool load(const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+
+	printf("----%d\n", if_->rsp);
+	printf("argv의 인자 개수 : %d\n",argc);
+
+	char *arg_address[128];
+
+	for (int i = argc - 1; i >= 0; i--)
+	{
+		int argv_len = strlen(argv[i]);
+		if_->rsp = if_->rsp - (argv_len + 1);
+		memcpy(if_->rsp,argv[i],argv_len + 1);
+		arg_address[i] = if_ -> rsp;
+	}
+
+	while (if_->rsp % 8 != 0){
+		if_->rsp = if_->rsp - 1;
+		memset(if_->rsp,0,1);
+	}
+
+	for (int i = argc; i >= 0; i--){
+		if_->rsp = if_->rsp - 8;
+		if (i == argc) {
+			memset(if_->rsp,0,8);
+		} else {
+			memcpy(if_->rsp,&arg_address[i],8);	
+		}
+	}
+
+	if_->rsp = if_->rsp - 8;
+	memset(if_->rsp,0,8);
+
+	if_->R.rsi = argv[0];
+	if_->R.rdi = argc;
 
 	success = true;
 

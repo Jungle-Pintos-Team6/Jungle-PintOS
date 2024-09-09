@@ -21,6 +21,7 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+#define USERPROG
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -116,6 +117,9 @@ int main(void) {
 
 	printf("Boot complete.\n");
 
+	for (int i = 0; argv[i] != NULL; i++) {
+		printf("argv[%d]: %s\n", i, argv[i]);
+	}
 	/* Run actions specified on kernel command line. */
 	run_actions(argv);
 
