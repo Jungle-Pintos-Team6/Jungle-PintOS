@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -12,7 +13,7 @@
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING, /* Running thread. */
-	THREAD_READY,	/* Not running but ready to run. */
+	THREAD_READY,   /* Not running but ready to run. */
 	THREAD_BLOCKED, /* Waiting for an event to trigger. */
 	THREAD_DYING	/* About to be destroyed. */
 };
@@ -20,12 +21,14 @@ enum thread_status {
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
-#define TID_ERROR ((tid_t) - 1) /* Error value for tid_t. */
+#define TID_ERROR ((tid_t)-1) /* Error value for tid_t. */
 
 /* Thread priorities. */
-#define PRI_MIN 0	   /* Lowest priority. */
+#define PRI_MIN 0	  /* Lowest priority. */
 #define PRI_DEFAULT 31 /* Default priority. */
-#define PRI_MAX 63	   /* Highest priority. */
+#define PRI_MAX 63	 /* Highest priority. */
+#define FDT_PAGES 2
+#define FDT_COUNT_LIMIT 128
 
 /* A kernel thread or user process.
  *
@@ -98,6 +101,16 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 	struct list_elem donation_elem;
+	struct file *running;
+	struct file **fdt;
+	int next_fd;
+	int exit_status;
+	struct semaphore load_sema;
+	struct semaphore exit_sema;
+	struct semaphore wait_sema;
+	struct intr_frame parent_if;
+	struct list child_list;
+	struct list_elem child_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.h": "c",
+        "*.inc": "c"
     },
     "[c]": {
         "editor.defaultFormatter": "xaver.clang-format",

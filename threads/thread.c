@@ -199,9 +199,14 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	if (t->fdt == NULL)
+		return TID_ERROR;
+
 	/* Add to run queue. */
 	thread_unblock(t);
 	thread_yield_as_priority();
+	list_push_back(&thread_current()->child_list, &t->child_elem);
 
 	return tid;
 }
@@ -405,10 +410,15 @@ static void init_thread(struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
-
+	t->next_fd = 2;
+	t->exit_status = 0;
 	t->original_priority = priority;
 	t->waiting_lock = NULL;
 	list_init(&(t->donations));
+	list_init(&(t->child_list));
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->wait_sema, 0);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -506,7 +516,7 @@ static void thread_launch(struct thread *th) {
 		"pop %%rbx\n"
 		"addq $(out_iret -  __next), %%rbx\n"
 		"movq %%rbx, 0(%%rax)\n" // rip
-		"movw %%cs, 8(%%rax)\n"	 // cs
+		"movw %%cs, 8(%%rax)\n"  // cs
 		"pushfq\n"
 		"popq %%rbx\n"
 		"mov %%rbx, 16(%%rax)\n" // eflags
